@@ -1,0 +1,23 @@
+{
+  "name": "zhihu-creator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Codex skill and CLI for researching, drafting, and safely publishing Zhihu answers",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "bin": {
+    "zhihu-creator": "./scripts/cli.js"
+  },
+  "scripts": {
+    "zhihu": "node scripts/cli.js",
+    "test": "node --test",
+    "check": "node --check scripts/cli.js && node --check scripts/lib/*.js && node --check tests/*.test.js"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0",
+    "undici": "^7.16.0"
+  }
+}
