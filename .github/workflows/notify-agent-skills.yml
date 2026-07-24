@@ -1,0 +1,22 @@
+name: Notify agent-skills to sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'SKILL.md'
+      - 'scripts/**'
+      - 'references/**'
+      - 'docs/**'
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger agent-skills sync
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.SYNC_TOKEN }}
+          repository: NNNNzs/agent-skills
+          event-type: sync-skill
+          client-payload: '{"skill": "zhihu-cli"}'
