@@ -1,4 +1,4 @@
 interface:
-  display_name: "知乎创作"
-  short_description: "搜索选题、研究问题、撰写草稿并安全发布或更新知乎回答"
-  default_prompt: "使用 $zhihu-creator 搜索合适的知乎问题，起草回答并在我确认后发布。"
+  display_name: "知乎 CLI"
+  short_description: "安全登录、检索、阅读、创作并确认后操作知乎内容的完整命令行工具"
+  default_prompt: "使用 $zhihu-cli 检索知乎并准备内容；任何账号写操作都先向我展示预览。"

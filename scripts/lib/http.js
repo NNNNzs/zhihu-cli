@@ -5,11 +5,17 @@ import { signRequest } from './zse-signer.js';
 const ALLOWED_HOSTS = new Set([
   'www.zhihu.com',
   'api.zhihu.com',
+  'zhuanlan.zhihu.com',
   'zhihu-pics-upload.zhimg.com',
 ]);
 
 const directDispatcher = new Agent({ connect: { timeout: 10_000 } });
 const proxyDispatchers = new Map();
+let httpLogger = null;
+
+export function setHttpLogger(logger) {
+  httpLogger = typeof logger === 'function' ? logger : null;
+}
 
 export const ANDROID_HEADERS = Object.freeze({
   'x-api-version': '3.1.8',
@@ -77,7 +83,7 @@ function buildHeaders(config, url, { headers = {}, bodyText = null, signed = fal
 export async function requestRaw(config, value, options = {}) {
   const url = assertAllowedUrl(value);
   const method = (options.method || 'GET').toUpperCase();
-  const retries = options.retries ?? (method === 'GET' ? 2 : 0);
+  const retries = method === 'GET' ? (options.retries ?? 2) : 0;
   let body = options.body;
   let bodyText = null;
   const headers = { ...(options.headers || {}) };
@@ -91,6 +97,7 @@ export async function requestRaw(config, value, options = {}) {
   }
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const startedAt = Date.now();
     let response;
     try {
       response = await fetch(url, {
@@ -103,11 +110,14 @@ export async function requestRaw(config, value, options = {}) {
       });
     } catch (error) {
       if (attempt < retries) {
+        httpLogger?.({ method, url: url.toString(), attempt, status: null, durationMs: Date.now() - startedAt, retrying: true });
         await new Promise((resolve) => setTimeout(resolve, 250 * (2 ** attempt)));
         continue;
       }
       throw new HttpError(`网络请求失败: ${error.message}`, { method, url: url.toString() });
     }
+
+    httpLogger?.({ method, url: url.toString(), attempt, status: response.status, durationMs: Date.now() - startedAt, retrying: attempt < retries && (response.status === 429 || response.status >= 500) });
 
     if (response.ok) return response;
     const text = await response.text();

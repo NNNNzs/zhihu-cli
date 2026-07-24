@@ -111,6 +111,25 @@ function normalizeToken(raw) {
   };
 }
 
+export function inspectImageFile(filePath) {
+  const resolvedPath = path.resolve(filePath);
+  const bytes = fs.readFileSync(resolvedPath);
+  if (bytes.length === 0) throw new Error(`图片文件为空: ${resolvedPath}`);
+  const { mimeType, extension } = detectImageType(bytes, resolvedPath);
+  const { width, height } = decodeImageSize(bytes);
+  if (width <= 0 || height <= 0) throw new Error(`无法读取图片尺寸: ${resolvedPath}`);
+  return {
+    path: resolvedPath,
+    fileName: path.basename(resolvedPath),
+    size: bytes.length,
+    width,
+    height,
+    mimeType,
+    extension,
+    sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+  };
+}
+
 async function uploadSingle(config, imageHash, bytes, mimeType, token, requestRawFn) {
   const date = new Date().toUTCString();
   const value = buildOssSignatureString({
@@ -119,7 +138,7 @@ async function uploadSingle(config, imageHash, bytes, mimeType, token, requestRa
   const signature = hmacSha1Base64(token.accessKey, value);
   await requestRawFn(config, `https://zhihu-pics-upload.zhimg.com/v2-${imageHash}`, {
     method: 'PUT',
-    retries: 1,
+    retries: 0,
     headers: { 'content-type': mimeType, ...ossHeaders(token, signature, date) },
     body: bytes,
   });
@@ -152,7 +171,7 @@ async function uploadGif(config, imageHash, bytes, token, requestRawFn) {
     const signature = hmacSha1Base64(token.accessKey, value);
     const response = await requestRawFn(config, `https://zhihu-pics-upload.zhimg.com/v2-${imageHash}?${subResource}`, {
       method: 'PUT',
-      retries: 1,
+      retries: 0,
       headers: { 'content-type': 'application/octet-stream', ...ossHeaders(token, signature, date) },
       body: bytes.subarray(offset, Math.min(bytes.length, offset + partSize)),
     });

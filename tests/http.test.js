@@ -51,7 +51,7 @@ test('POST does not retry and 403 is reported without request secrets', async ()
   };
   try {
     await assert.rejects(
-      requestJson(config, 'https://www.zhihu.com/api/v4/content/publish', { method: 'POST', retries: 0, body: { x: 1 } }),
+      requestJson(config, 'https://www.zhihu.com/api/v4/content/publish', { method: 'POST', retries: 99, body: { x: 1 } }),
       (error) => error instanceof HttpError && error.status === 403 && error.zhihuCode === 403,
     );
     assert.equal(calls, 1);

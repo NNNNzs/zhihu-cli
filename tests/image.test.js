@@ -92,7 +92,7 @@ test('new PNG uses OSS HMAC upload and completion notification', async () => {
     const upload = rawCalls.find((call) => call.url.startsWith('https://zhihu-pics-upload.zhimg.com/'));
     const notification = rawCalls.find((call) => call.url.endsWith('/uploading_status'));
     assert.equal(upload.options.method, 'PUT');
-    assert.equal(upload.options.retries, 1);
+    assert.equal(upload.options.retries, 0);
     assert.match(upload.options.headers.authorization, /^OSS id:/);
     assert.equal(notification.options.method, 'PUT');
     assert.equal(notification.options.retries, 0);

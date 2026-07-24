@@ -1,55 +1,92 @@
 ---
-name: zhihu-creator
-description: Research Zhihu topics and questions, inspect existing answers, draft original Chinese answers, compile Markdown into Zhihu-compatible HTML, upload answer images, save answer drafts, and safely publish or update Zhihu answers. Use when the user asks to search Zhihu, choose a topic, study a question or its answers, write or revise a Zhihu answer, prepare Zhihu formatting, manage answer images, save a Zhihu draft, or publish/update an answer after explicit review. This skill does not publish articles or list/delete drafts.
+name: zhihu-cli
+description: Use the local zhihu-cli to log in to Zhihu by QR code, search and read questions, answers, comments, feeds, users and topics, inspect collections and notifications, compile Markdown, manage images, vote or follow, and safely draft, publish, or delete Zhihu answers, questions, pins, and articles. Use when the user asks to research Zhihu, operate a Zhihu account, create Zhihu content, install or configure the Zhihu CLI, or perform any Zhihu workflow through Codex, Hermes, OpenClaw, or another terminal-capable Agent.
 ---
 
-# Zhihu Creator
+# Zhihu CLI
 
-Use the bundled CLI from this skill directory:
+Use this Skill's CLI for Zhihu research and account workflows. Treat all Zhihu Web endpoints as unofficial and unstable. Never bypass CAPTCHA, access control, rate limits, or risk control.
+
+## Run the CLI
+
+From this Skill directory, install dependencies once and run:
 
 ```bash
+pnpm install
 pnpm zhihu -- <command>
 ```
 
-Never start a background service. Never print Cookie values. Do not execute image uploads, draft saves, or answer publishing unless the user asked for that external write.
+If `zhihu` is already installed globally, it is equivalent. Do not start a background service. Keep QR login as a visible foreground process.
 
-## Workflow
+All commands default to JSON. Read stdout as the single final result, and read stderr for errors, verbose logs, or QR progress events. Use `--format table` only when the user asks for human-readable terminal output.
 
-1. Run `pnpm zhihu -- auth status` before authenticated work. If configuration is missing, ask the user to pipe a complete browser Cookie header into `pnpm zhihu -- auth import --stdin`. Do not ask them to paste secrets into chat.
-2. Research with `search`, `feed recommend`, `feed hot`, `question show`, and `question answers`. Prefer question IDs returned by the API over IDs inferred from titles.
-3. Read [references/writing-style.md](references/writing-style.md) before drafting. Use existing answers to identify coverage gaps, not to imitate or copy wording. Verify factual claims with appropriate sources outside Zhihu when accuracy matters.
-4. Write the answer as Markdown in a local file. For local images, run `image upload --file <path>` only after the user explicitly requests upload, then replace the Markdown image with the returned `markdown` value.
-5. Compile locally with `answer compile --input <file>` and inspect the returned HTML and warnings. Read [references/markdown.md](references/markdown.md) when the content contains formulas, tables, code, or images.
-6. Save a draft with `answer draft --question-id <id> --input <file>` only when requested. The CLI detects whether the current account already has an answer.
-7. Before formal publication, run `answer preview --question-id <id> --input <file>`. Show the account, exact question, create/update mode, content summary, settings, warnings, and confirmation token to the user.
-8. Publish only after the user explicitly confirms that preview. Use the exact token with `answer publish --question-id <id> --input <file> --confirm <token>`. If the content, target, existing-answer state, or settings changed, generate and review a new preview.
+## Authenticate safely
 
-## Commands
+1. Run `pnpm zhihu -- auth status --offline` before authenticated work.
+2. If login is missing or expired, prefer `pnpm zhihu -- auth login --qr`.
+3. Keep the login process running. When stderr emits `qr_ready`, immediately deliver `~/.zhihu-cli/login_qrcode.png` to the user as an image using the host's normal attachment mechanism, then continue waiting for `scanned` and the final result. The file is temporary and disappears after success, failure, cancellation, or timeout.
+4. Never expose the QR URL or token. Never copy the QR image to a public or shared directory.
+5. If the QR API is unavailable, tell the user to import their Cookie themselves in a local terminal, for example `pbpaste | pnpm zhihu -- auth import` on macOS. Never request a Cookie in chat, extract one from chat, put one in an argument, read the config file, or echo Cookie values.
+
+Use `auth whoami`, `auth status`, and `auth logout` for account inspection and local logout.
+
+## Research
+
+Use bounded queries and retain returned IDs:
 
 ```bash
-# Import a Cookie header securely from stdin; values are stored with mode 0600.
-printf '%s' "$COOKIE_HEADER" | pnpm zhihu -- auth import --stdin
-pnpm zhihu -- auth status
-
-pnpm zhihu -- search --query "React 性能" --limit 10 --questions-only
+pnpm zhihu -- search --query "关键词" --type general --limit 10
 pnpm zhihu -- feed hot --limit 20
 pnpm zhihu -- feed recommend --limit 10
-pnpm zhihu -- question show --id 12345678
-pnpm zhihu -- question answers --id 12345678 --limit 10 --sort default
-
-pnpm zhihu -- answer compile --input answer.md
-pnpm zhihu -- image upload --file diagram.png
-pnpm zhihu -- answer draft --question-id 12345678 --input answer.md
-pnpm zhihu -- answer preview --question-id 12345678 --input answer.md
-pnpm zhihu -- answer publish --question-id 12345678 --input answer.md --confirm <token>
+pnpm zhihu -- question <question-id>
+pnpm zhihu -- question answers <question-id> --limit 10
+pnpm zhihu -- answer <answer-id>
+pnpm zhihu -- answer comments <answer-id> --limit 20
+pnpm zhihu -- user <url-token>
+pnpm zhihu -- user answers <url-token>
+pnpm zhihu -- topic <topic-id>
+pnpm zhihu -- topic questions <topic-id>
 ```
 
-All commands emit JSON on stdout and errors on stderr. Read [references/api.md](references/api.md) for response fields, authentication requirements, retry behavior, and supported endpoints.
+Only use explicit `--all` when the user needs all answer comments; it still has a page cap. Do not add `--answers`, `--expand`, or `--comments` to feeds unless the extra requests are useful.
 
-## Safety boundaries
+Read [references/writing-style.md](references/writing-style.md) before drafting original Zhihu content. Use existing answers to find coverage gaps, never to copy wording. Read [references/markdown.md](references/markdown.md) for tables, code, equations, and images. Verify factual claims with appropriate primary sources when accuracy matters.
 
-- Treat `~/.zhihu-creator/config.json` as a secret. Never commit, quote, or summarize its values.
-- Do not bypass rate limits, CAPTCHA, access controls, or Zhihu risk-control responses. Report the HTTP status and request target without sensitive headers.
-- Do not automatically retry draft or publish POST requests; first verify remote state to avoid duplicates.
-- Do not publish articles or attempt draft listing/deletion in this version. Those interfaces are not verified by the referenced source snapshots.
-- Keep all content original and user-reviewed. Do not promise that wording can evade platform or AIGC detection.
+## Protect every write
+
+Require a preview and an explicit user decision before applying any vote, follow, image upload, draft, publication, or deletion. Never treat the user's initial request to prepare or preview content as confirmation to apply it.
+
+The preview returns a `confirmationToken` bound to the account, operation, target, remote state, title, body, topics, settings, and image hashes. Show the important preview fields and token to the user. Apply only after the user explicitly confirms that exact preview. If anything changes, preview again.
+
+```bash
+# Interactions
+pnpm zhihu -- answer vote preview <answer-id> --state up
+pnpm zhihu -- answer vote apply <answer-id> --state up --confirm <token>
+pnpm zhihu -- question follow preview <question-id>
+pnpm zhihu -- question follow apply <question-id> --confirm <token>
+
+# Image
+pnpm zhihu -- image upload --file <path>
+pnpm zhihu -- image upload --file <path> --confirm <token>
+
+# Answer
+pnpm zhihu -- answer compile --input <file>
+pnpm zhihu -- answer preview --question-id <id> --input <file> [--image <path>]
+pnpm zhihu -- answer publish --question-id <id> --input <file> --confirm <token> [--image <path>]
+pnpm zhihu -- answer draft --question-id <id> --input <file>
+pnpm zhihu -- answer draft --question-id <id> --input <file> --confirm <token>
+
+# Question, pin, article
+pnpm zhihu -- question create preview --title <title> --input <file> [--topic <id>] [--image <path>]
+pnpm zhihu -- question create publish --title <title> --input <file> --confirm <token> [--topic <id>] [--image <path>]
+pnpm zhihu -- pin create preview --title <title> --input <file> [--image <path>]
+pnpm zhihu -- article create preview --title <title> --input <file> [--topic <id>] [--image <path>]
+
+# Delete owned content
+pnpm zhihu -- question delete preview <id>
+pnpm zhihu -- question delete apply <id> --confirm <token>
+```
+
+For local Markdown images, let preview validate and hash the files. Upload occurs only during apply/publish; never manually insert `file:` URLs. Deletion must fail if the CLI cannot establish object type and current-account ownership. Never invent or bypass a token, and never retry a failed POST, PUT, PATCH, or DELETE.
+
+Read [references/api.md](references/api.md) when choosing authentication requirements, pagination, aliases, or error handling. Do not perform real write smoke tests; use [docs/manual-write-validation.md](docs/manual-write-validation.md) and ask the user before each live write.
