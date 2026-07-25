@@ -23,6 +23,15 @@ test('CLI exposes the competitor aliases and grouped P0-P4 commands', async () =
   assert.equal(answer.commands.some((command) => command.name() === 'vote'), true);
 });
 
+test('Skill metadata identifies the npm package, canonical command, and release version', () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(projectDirectory, 'package.json'), 'utf8'));
+  const skill = fs.readFileSync(path.join(projectDirectory, 'SKILL.md'), 'utf8');
+  assert.match(skill, /^name: zhihu-cli$/m);
+  assert.match(skill, new RegExp(`^  version: ["']?${packageJson.version.replaceAll('.', '\\.')}` + `["']?$`, 'm'));
+  assert.match(skill, /`zhihu` is the canonical executable/);
+  assert.match(skill, /bins: \[node, npm\]/);
+});
+
 test('CLI accepts the pnpm separator and compiles stdin', () => {
   const result = spawnSync(process.execPath, ['scripts/cli.js', '--', 'answer', 'compile', '--input', '-'], {
     cwd: projectDirectory,

@@ -1,7 +1,7 @@
 {
   "name": "zhihu-cli",
   "version": "1.0.0",
-  "description": "Zhihu CLI and Agent Skill for research, answer workflows, and safe publishing",
+  "description": "Zhihu CLI and Agent Skill for research, safe account workflows, and publishing",
   "type": "module",
   "license": "AGPL-3.0-only",
   "engines": {

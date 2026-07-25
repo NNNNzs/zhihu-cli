@@ -6,50 +6,43 @@
 
 ## 安装
 
-要求 Node.js `>=20.18.1`，推荐使用 pnpm。
+要求 Node.js `>=20.18.1`，推荐使用 npm。
 
 ```bash
-# 全局安装；发布到 npm 后可直接使用
-pnpm add -g zhihu-cli
+# npm registry 发布后，全局安装
+npm install -g zhihu-cli
 zhihu --version
 
-# 不全局安装
-pnpm dlx zhihu-cli --version
+# 当前可用的源码安装方式（同样只使用 npm）
+npm install -g github:NNNNzs/zhihu-cli
+zhihu --version
 
 # 源码安装
 git clone https://github.com/NNNNzs/zhihu-cli.git
 cd zhihu-cli
-pnpm install
-pnpm zhihu -- --version
+npm install
+npm run zhihu -- --version
 ```
 
-包同时提供 `zhihu` 和 `zhihu-cli` 两个 bin。源码开发入口为 `pnpm zhihu -- <command>`。本项目不需要也不会自动启动后台服务。
+`zhihu-cli` 是 npm 包名与 Skill 名，`zhihu` 是唯一推荐的命令。`zhihu-cli` 可执行文件仅为向后兼容保留；文档、脚本和 Agent 指令均应使用 `zhihu`。本项目不需要也不会自动启动后台服务。
 
 可以把下面这句话直接发给支持终端和 Agent Skills 的 Agent：
 
-> 请安装 `https://github.com/NNNNzs/zhihu-cli.git` 中的 `zhihu-cli` Skill，使用 pnpm 安装依赖并读取根 `SKILL.md`；优先让我扫码登录，不要要求我在聊天中发送 Cookie，任何写操作都先给我预览和确认令牌。
+> 请安装 `NNNNzs/zhihu-cli` 中的 `zhihu-cli` Skill，并用 npm 安装 `zhihu-cli`；如需登录，让我在自己的本机终端粘贴 Cookie 后通过 stdin 导入，绝不要求我在聊天中发送 Cookie；任何写操作都先给我预览和确认令牌。
 
 ## 登录
 
-推荐扫码登录：
+推荐由用户在自己的本机终端粘贴 Cookie 后导入。Cookie 只能经标准输入传递，不能发进聊天、放入命令参数或提交到仓库。
 
 ```bash
-zhihu auth login --qr
-# 兼容别名
-zhihu login --qrcode
-```
-
-JSON 模式会在 stderr 输出不含二维码 URL、token 或 Cookie 的 `qr_ready`、`scanned`、`confirmed`、`expired` 事件，stdout 只在流程结束后输出一次结果。二维码临时写入 `~/.zhihu-cli/login_qrcode.png`，权限为 `0600`；成功、超时、取消和 logout 后都会删除。使用 `--format table` 时终端也会显示二维码。
-
-如果扫码接口不可用，可由用户本人在本机终端从标准输入导入浏览器 Cookie。不要把 Cookie 发进聊天、放入命令参数或提交到仓库。
-
-```bash
-# macOS
+# macOS：用户先在浏览器中复制 Cookie，再执行
 pbpaste | zhihu auth import
 
 # 已有本地文件
 zhihu auth import < cookies.txt
 ```
+
+当前知乎二维码登录接口会返回 HTTP 403，因此二维码不再作为推荐方案。保留 `zhihu auth login --qr` 与兼容别名 `zhihu login --qrcode` 仅供接口恢复后的人工排障；不要让 Agent 转发二维码、二维码 URL 或 token。
 
 登录态保存在 `~/.zhihu-cli/config.json`，目录和文件权限分别为 `0700`、`0600`。旧 `~/.zhihu-creator/config.json` 与 `ZHIHU_CREATOR_CONFIG` 只做兼容读取；新覆盖变量为 `ZHIHU_CLI_CONFIG`。
 
@@ -149,35 +142,40 @@ zhihu article delete preview 456
 
 ## Agent 安装
 
-仓库根 `SKILL.md` 是唯一源文件，`pnpm sync:skills` 生成 `dist/skills/zhihu-cli/` 的 ClawHub/OpenClaw 分发副本，`pnpm check:skills` 检查漂移。
+仓库根 `SKILL.md` 是唯一源文件，包含与 npm 包版本一致的 Skill 元数据；`pnpm sync:skills` 生成 `dist/skills/zhihu-cli/` 的分发副本，`pnpm check:skills` 检查漂移。
 
 ```bash
-# Codex
-git clone https://github.com/NNNNzs/zhihu-cli.git ~/.codex/skills/zhihu-cli
-pnpm --dir ~/.codex/skills/zhihu-cli install
+# 安装到所有三个宿主（Skills CLI 当前支持 Codex、Hermes Agent、OpenClaw）
+npx --yes skills add NNNNzs/zhihu-cli --skill zhihu-cli --global \
+  --agent codex --agent hermes-agent --agent openclaw
 
-# Hermes
-git clone https://github.com/NNNNzs/zhihu-cli.git ~/.hermes/skills/zhihu-cli
-pnpm --dir ~/.hermes/skills/zhihu-cli install
+# 安装当前运行时命令；npm registry 发布后可替换为 npm install -g zhihu-cli
+npm install -g github:NNNNzs/zhihu-cli
 
-# OpenClaw 源码安装；按实际 workspace 调整路径
-git clone https://github.com/NNNNzs/zhihu-cli.git ~/.openclaw/workspace/skills/zhihu-cli
-pnpm --dir ~/.openclaw/workspace/skills/zhihu-cli install
+# 只安装到一个宿主时，替换 --agent 的值：codex、hermes-agent 或 openclaw
+npx --yes skills add NNNNzs/zhihu-cli --skill zhihu-cli --global --agent openclaw
 ```
 
-安装后开启新会话，或按宿主方式刷新 Skills。扫码时 Agent 应保持登录命令为前台会话，收到 `qr_ready` 后立即把本地 PNG 作为图片交付给用户，再继续等待扫码结果；不能读取、回显或转发 Cookie。
+OpenClaw 也可以不用 Skills CLI，直接从 Git 安装：
+
+```bash
+openclaw skills install git:NNNNzs/zhihu-cli
+npm install -g github:NNNNzs/zhihu-cli
+```
+
+安装后开启新会话，或按宿主方式刷新 Skills。Agent 应要求用户在其本机终端执行粘贴导入命令，不能读取、回显、转发 Cookie 或二维码凭证。
 
 升级源码安装：
 
 ```bash
-git -C <skill-directory> pull --ff-only
-pnpm --dir <skill-directory> install
+npx --yes skills update zhihu-cli --global
+npm install -g github:NNNNzs/zhihu-cli
 ```
 
 全局安装升级：
 
 ```bash
-pnpm update -g zhihu-cli
+npm update -g zhihu-cli # npm registry 发布后
 ```
 
 ## 开发与验证
@@ -193,7 +191,7 @@ pnpm verify:pack
 ZHIHU_LIVE_TESTS=1 pnpm test:live
 ```
 
-架构和目录索引见 [AGENTS.md](AGENTS.md)，接口约定见 [references/api.md](references/api.md)，Markdown 规则见 [references/markdown.md](references/markdown.md)，竞品分析见 [docs/competitive-analysis-python-zhihu-cli.md](docs/competitive-analysis-python-zhihu-cli.md)。
+架构和目录索引见 [AGENTS.md](AGENTS.md)，接口约定见 [references/api.md](references/api.md)，Markdown 规则见 [references/markdown.md](references/markdown.md)，历史功能对比与设计决策见 [docs/competitive-analysis.md](docs/competitive-analysis.md)。
 
 ## 许可与来源
 

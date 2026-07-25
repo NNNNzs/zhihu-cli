@@ -1,6 +1,6 @@
 # 项目索引
 
-`zhihu-cli` 是 Node.js 20 + pnpm 的知乎 CLI 与 Agent Skill。不要自动启动服务；CLI 都是前台短进程，扫码登录是最长 120 秒的前台会话。
+`zhihu-cli` 是 Node.js 20 + pnpm 的知乎 CLI 与 Agent Skill。不要自动启动服务；CLI 都是前台短进程。用户登录优先在本机通过 stdin 粘贴导入 Cookie；二维码登录因上游 403 仅保留作人工排障兼容入口。
 
 ## 目录
 
