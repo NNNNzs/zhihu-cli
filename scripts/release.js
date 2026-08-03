@@ -171,6 +171,8 @@ function publish(options) {
     '--registry',
     options.registry,
     '--no-git-checks',
+    '--reporter',
+    'append-only',
   ]);
   process.stdout.write('[release] 发布命令已完成；npm registry 可能需要短暂时间同步\n');
 }
