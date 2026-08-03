@@ -635,7 +635,7 @@ function registerWriteCommands(program) {
 
 export function createProgram() {
   const program = new Command();
-  program.name('zhihu').description('面向人类与 Agent 的知乎 CLI').version(packageJson.version, '-V, --version')
+  program.name('zhihu-cli').description('面向人类与 Agent 的 zhihu-cli').version(packageJson.version, '-V, --version')
     .option('--format <format>', '输出格式 json|table', 'json').option('--verbose', '输出脱敏 HTTP 调试日志');
   program.exitOverride().showSuggestionAfterError(true).configureOutput({ writeErr: () => {} });
   program.hook('preAction', (_thisCommand, actionCommand) => {
@@ -659,7 +659,7 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
   try {
-    await program.parseAsync(['node', 'zhihu', ...argv]);
+    await program.parseAsync(['node', 'zhihu-cli', ...argv]);
   } catch (error) {
     if (error instanceof CommanderError && ['commander.helpDisplayed', 'commander.version'].includes(error.code)) return;
     if (error instanceof CommanderError) throw new UsageError(error.message);

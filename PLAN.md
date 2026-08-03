@@ -2,11 +2,11 @@
 
 ## 产品定位
 
-项目是完整的知乎 CLI，同时通过根 `SKILL.md` 适配 Agent Skills。它不再仅是回答创作工具：读取覆盖竞品 27 项能力，保留 Markdown、图片和回答发布优势，并为全部写操作增加两阶段确认。
+项目是完整的 `zhihu-cli`，同时通过根 `SKILL.md` 适配 Agent Skills。它不再仅是回答创作工具：读取覆盖竞品 27 项能力，保留 Markdown、图片和回答发布优势，并为全部写操作增加两阶段确认。
 
 ## 已实现
 
-- P0：Commander 命令树、双 bin、二维码登录、whoami/status/logout、配置迁移、JSON/table 输出和脱敏日志。
+- P0：Commander 命令树、单 `zhihu-cli` bin、二维码登录、whoami/status/logout、配置迁移、JSON/table 输出和脱敏日志。
 - P1：搜索、热榜、推荐、问题、回答、评论、用户、话题、收藏、通知及统一分页。
 - P2：回答赞同/取消与问题关注/取消，带远端状态校验和幂等结果。
 - P3：回答、提问、想法和文章的 Markdown/图片预览与发布；问题、想法和文章安全删除。

@@ -315,7 +315,7 @@ x-zse-96 = "2.0_" + signature
 
 ## 六、NNNNzs CLI 的差异化定位
 
-> **唯一同时具备"CLI 工具广度 + Agent 安全模型 + Markdown 创作链路"的知乎 CLI。**
+> **唯一同时具备"CLI 工具广度 + Agent 安全模型 + Markdown 创作链路"的 `zhihu-cli`。**
 
 核心差异化：
 1. **两阶段写操作 + 确认令牌**：所有写操作先 preview，再用绑定账户/目标/内容的 token 确认

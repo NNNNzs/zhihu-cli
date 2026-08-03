@@ -1,6 +1,6 @@
 # 项目索引
 
-`zhihu-cli` 是 Node.js 20 + pnpm 的知乎 CLI 与 Agent Skill。不要自动启动服务；CLI 都是前台短进程。用户登录优先在本机通过 stdin 粘贴导入 Cookie；二维码登录因上游 403 仅保留作人工排障兼容入口。
+`zhihu-cli` 是 Node.js 20 + pnpm 的 CLI 与 Agent Skill，用于知乎内容研究和账号工作流。不要自动启动服务；CLI 都是前台短进程。用户登录优先在本机通过 stdin 粘贴导入 Cookie；二维码登录因上游 403 仅保留作人工排障入口。
 
 ## 目录
 
@@ -17,15 +17,14 @@
 - `tests/`：mock 单元、命令和显式只读集成测试。
 - `docs/`：竞品分析与人工验证清单。
 - `references/`：Skill 按需读取的 API、Markdown、写作与来源资料。
-- `SKILL.md`：唯一 Skill 源文件。
-- `dist/skills/zhihu-cli/`：由 `pnpm sync:skills` 生成的分发副本，不直接编辑。
+- `SKILL.md`：Skill 唯一入口和源文件，直接从仓库根目录分发。
+- `references/`、`docs/`：Skill 引用资料，随根目录 Skill 一起分发。
 
 ## 开发命令
 
 ```bash
 pnpm test
 pnpm check
-pnpm sync:skills
 pnpm pack --dry-run
 pnpm verify:pack
 ```

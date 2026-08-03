@@ -1,4 +1,4 @@
-# 知乎 CLI 功能对比与设计决策记录
+# zhihu-cli 功能对比与设计决策记录
 
 > 状态：本文是公开资料形成的历史设计记录，不是当前功能清单或未来路线图。功能与命令以 README、SKILL.md 和测试为准；外部项目会持续变化，读者应自行复核链接与提交快照。
 
@@ -111,7 +111,7 @@ flowchart LR
 
 | 能力 | Python 竞品 | 当前项目 | 差距与建议 |
 |---|---|---|---|
-| 全局可执行命令 | `zhihu` | package bin 为 `zhihu-cli`，开发时 `pnpm zhihu` | P0。正式分发时同时提供 `zhihu` bin，保留 `zhihu-cli` 别名 |
+| 全局可执行命令 | `zhihu` | package bin 为 `zhihu-cli`，开发时 `pnpm zhihu-cli` | 当前项目已统一使用 `zhihu-cli` |
 | 人类可读终端输出 | Rich 表格、颜色、提示 | 仅 JSON | P4。默认 JSON 对 Agent 更稳；可增加 `--format table`，不要改变机器默认 |
 | JSON 输出 | 多数命令可选 `--json`，存在例外 | 所有成功结果统一 JSON | 当前更一致 |
 | 版本命令 | `--version` | ❌ | P0。增加 `--version` |
@@ -152,7 +152,7 @@ sequenceDiagram
 4. 二维码 PNG 内含临时登录令牌，应使用 `0600` 权限；成功、超时、取消或 logout 后删除。
 5. 登录必须是前台、可中断流程，不启动后台服务。Agent 获取图片路径后可把图片交付给用户，但不能把 Cookie 输出到 stdout。
 6. 扫码成功后应原子写入 `~/.zhihu-cli/config.json`，目录 `0700`、文件 `0600`，并保留现有 Cookie 配置结构。
-7. 命令建议采用 `zhihu auth login --qr`，同时提供简短别名 `zhihu login --qr`；输出事件应为 JSON Lines 或一个最终 JSON，明确 `qr_ready`、`scanned`、`confirmed`、`expired` 状态。
+7. 命令采用 `zhihu-cli auth login --qr`，不提供旧的短命令别名；输出事件应为 JSON Lines 或一个最终 JSON，明确 `qr_ready`、`scanned`、`confirmed`、`expired` 状态。
 
 ## 5. 竞品可借鉴但不应照搬的设计
 
@@ -185,7 +185,7 @@ sequenceDiagram
 
 1. 扫码登录：QR token、PNG、终端/Agent 交付、轮询状态机、登录校验与清理。
 2. `auth logout`、`auth whoami`、`--version`。
-3. `zhihu` 与 `zhihu-cli` 两个 bin；规范正式安装命令。
+3. 只提供 `zhihu-cli` 一个 bin，并将其作为规范正式安装命令。
 4. 将 CLI 拆分为 `commands/`、`client/`、`auth/`，避免继续扩大单文件入口。
 5. 为扫码流程建立纯 mock 单元测试和可显式开启的集成测试。
 
@@ -233,6 +233,6 @@ sequenceDiagram
 
 完成对齐后，项目应定位为：
 
-> 面向人类与 AI Agent 的完整知乎 CLI：支持安全登录、内容检索与阅读、用户和话题研究、互动、Markdown 创作、多类型内容发布与受确认保护的写操作。
+> 面向人类与 AI Agent 的完整 `zhihu-cli`：支持安全登录、内容检索与阅读、用户和话题研究、互动、Markdown 创作、多类型内容发布与受确认保护的写操作。
 
-当前项目的核心差异化不是“比竞品多几个命令”，而是把知乎 CLI 的广度与回答创作链路的安全性结合起来。
+当前项目的核心差异化不是“比竞品多几个命令”，而是把 `zhihu-cli` 的广度与回答创作链路的安全性结合起来。

@@ -1,4 +1,4 @@
 interface:
-  display_name: "知乎 CLI"
-  short_description: "安全登录、检索、阅读、创作并确认后操作知乎内容的完整命令行工具"
+  display_name: "zhihu-cli"
+  short_description: "zhihu-cli：安全登录、检索、阅读、创作并确认后操作知乎内容"
   default_prompt: "使用 $zhihu-cli 检索知乎并准备内容；如需登录，指导我在自己的本机终端通过 stdin 粘贴导入 Cookie；任何账号写操作都先向我展示预览。"

@@ -1,21 +1,19 @@
 {
   "name": "zhihu-cli",
   "version": "1.0.0",
-  "description": "Zhihu CLI and Agent Skill for research, safe account workflows, and publishing",
+  "description": "zhihu-cli Node.js CLI and Agent Skill for research, safe account workflows, and publishing",
   "type": "module",
   "license": "AGPL-3.0-only",
   "engines": {
     "node": ">=20.18.1"
   },
   "bin": {
-    "zhihu": "./scripts/cli.js",
     "zhihu-cli": "./scripts/cli.js"
   },
   "files": [
     "scripts",
     "references",
     "agents",
-    "dist/skills",
     "docs",
     "AGENTS.md",
     "SKILL.md",
@@ -31,7 +29,7 @@
     "url": "https://github.com/NNNNzs/zhihu-cli/issues"
   },
   "keywords": [
-    "zhihu",
+    "zhihu-cli",
     "cli",
     "agent-skill",
     "codex",
@@ -42,12 +40,10 @@
     "access": "public"
   },
   "scripts": {
-    "zhihu": "node scripts/cli.js",
+    "zhihu-cli": "node scripts/cli.js",
     "test": "node --test",
     "test:live": "ZHIHU_LIVE_TESTS=1 node --test tests/live.test.js",
-    "check": "node --check scripts/cli.js && node --check scripts/lib/*.js && node --check tests/*.test.js && pnpm check:skills",
-    "sync:skills": "node scripts/sync-skill.js",
-    "check:skills": "node scripts/sync-skill.js --check",
+    "check": "node --check scripts/cli.js && node --check scripts/lib/*.js && node --check tests/*.test.js",
     "verify:pack": "node scripts/verify-pack.js",
     "prepack": "pnpm check"
   },

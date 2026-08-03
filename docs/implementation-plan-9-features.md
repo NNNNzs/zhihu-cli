@@ -1,4 +1,4 @@
-# 知乎 CLI 九项功能实施计划
+# zhihu-cli 九项功能实施计划
 
 > 由 Codex (gpt-5.6-sol) 于 2026-08-02 生成
 > 基于对项目源码的深度阅读
@@ -30,8 +30,8 @@
 建议命令：
 
 ```bash
-zhihu feed hot-search --limit 20
-zhihu hot-search --limit 20
+zhihu-cli feed hot-search --limit 20
+zhihu-cli hot-search --limit 20
 ```
 
 避免把"热搜词"和现有"热榜内容"混在同一个 `hot` 命令中。
@@ -56,7 +56,7 @@ zhihu hot-search --limit 20
   - 增加显式只读、环境变量控制的 live smoke test
 - `README.md`、`SKILL.md`、`references/api.md`
   - 补充命令和匿名读取说明
-- 最后运行 `pnpm sync:skills`
+- 最后运行 `pnpm check`
 
 主要风险：
 
@@ -95,7 +95,7 @@ zhihu hot-search --limit 20
   - 覆盖 `-V`
   - 覆盖 stdout 只有版本号、stderr 为空、退出码为 0
 - `scripts/verify-pack.js`
-  - 保留对两个 bin：`zhihu`、`zhihu-cli` 的安装包验证
+  - 只验证 `zhihu-cli` 一个 bin 的安装包行为
 - `README.md`
   - 保持源码、全局安装、`pnpm dlx` 三种调用示例
 
@@ -108,9 +108,8 @@ zhihu hot-search --limit 20
 验收标准：
 
 ```bash
-zhihu --version
-zhihu -V
 zhihu-cli --version
+zhihu-cli -V
 ```
 
 都精确输出 `package.json` 中的版本，并以 0 退出。
@@ -132,10 +131,10 @@ getArticle(config, id)
 建议命令设计：
 
 ```bash
-zhihu article show <id>
+zhihu-cli article show <id>
 ```
 
-不要直接使用 `zhihu article <id>`，因为现有 `article` 父命令已有创建选项，直接增加位置参数容易产生歧义。
+不要直接使用 `zhihu-cli article <id>`，因为现有 `article` 父命令已有创建选项，直接增加位置参数容易产生歧义。
 
 修改文件：
 
@@ -389,13 +388,13 @@ PUT /images/{id}/uploading_status
 建议命令行为：
 
 ```bash
-pbpaste | zhihu auth import
+pbpaste | zhihu-cli auth import
 ```
 
 导入后自动补全；如果网络补全失败，可以保存已有 Cookie，但返回 warning，并明确哪些操作仍不可用。也可提供：
 
 ```bash
-zhihu auth repair
+zhihu-cli auth repair
 ```
 
 用于已有配置的显式修复。
@@ -552,7 +551,6 @@ zhihu auth repair
 ```bash
 pnpm test
 pnpm check
-pnpm sync:skills
 pnpm pack --dry-run
 pnpm verify:pack
 ```
@@ -562,7 +560,7 @@ pnpm verify:pack
 - 纯函数单元测试：归一化、标题映射、Cookie 解析、table 渲染。
 - HTTP mock：端点、通道 headers、重试、401 刷新、Set-Cookie。
 - CLI 子进程测试：命令树、stdout/stderr、退出码、别名、版本。
-- 打包测试：两个 bin 的 `--version` 和 Skill 分发一致性。
+- 打包测试：`zhihu-cli` bin 的 `--version` 和 Skill 分发一致性。
 - 只读 live 测试：热搜、文章详情；默认跳过。
 - 写流程只使用 mock 和人工验证清单，不能自动执行真实图片上传或发布。
 
