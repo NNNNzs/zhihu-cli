@@ -3,7 +3,7 @@ name: zhihu-cli
 description: Use the zhihu-cli command to import a local Zhihu Cookie, research questions, answers, comments, feeds, users and topics, compile Markdown, and safely preview or apply Zhihu account actions. Use for zhihu-cli research, account workflows, content creation, or CLI setup in Codex, Hermes, OpenClaw, and other terminal-capable agents.
 homepage: https://github.com/NNNNzs/zhihu-cli
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
   author: NNNNzs
   license: AGPL-3.0-only
   repository: https://github.com/NNNNzs/zhihu-cli

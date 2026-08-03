@@ -27,6 +27,13 @@ pnpm test
 pnpm check
 pnpm pack --dry-run
 pnpm verify:pack
+pnpm release
 ```
+
+## 版本规范
+
+- `package.json` 的 `version` 是当前 npm 包与 CLI 的发布版本。
+- 每次发布必须同步更新根目录 `SKILL.md` 的 `metadata.version`；仓库中不得出现 npm 包版本与 Skill 版本不一致。
+- 版本更新后必须运行 `pnpm check`、`pnpm test`、`pnpm verify:pack` 和 `pnpm release`；发布只允许通过 `pnpm release -- --publish` 执行。
 
 使用 `apply_patch` 做有意编辑；保留用户已有未提交改动。写请求必须零重试，凭证和二维码 token 不得进入输出、日志、测试快照或包内容。

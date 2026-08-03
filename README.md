@@ -192,10 +192,20 @@ pnpm test
 pnpm check
 pnpm pack --dry-run
 pnpm verify:pack
+pnpm release
 
 # 只读真实接口，默认不会运行
 ZHIHU_LIVE_TESTS=1 pnpm test:live
 ```
+
+`pnpm release` 只运行发布前检查，不会上传 npm。确认检查通过、版本号已更新且已登录 npm 后，再显式执行：
+
+```bash
+pnpm release -- --publish
+pnpm release -- --publish --tag next
+```
+
+默认发布到官方 npm registry；私有 registry 可通过 `--registry <url>` 指定。脚本不会自动升级版本号，也不会把 npm token 写入命令行。
 
 架构和目录索引见 [AGENTS.md](AGENTS.md)，接口约定见 [references/api.md](references/api.md)，Markdown 规则见 [references/markdown.md](references/markdown.md)，历史功能对比与设计决策见 [docs/competitive-analysis.md](docs/competitive-analysis.md)。
 

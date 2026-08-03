@@ -1,6 +1,6 @@
 {
   "name": "zhihu-cli",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "zhihu-cli Node.js CLI and Agent Skill for research, safe account workflows, and publishing",
   "type": "module",
   "license": "AGPL-3.0-only",
@@ -43,8 +43,9 @@
     "zhihu-cli": "node scripts/cli.js",
     "test": "node --test",
     "test:live": "ZHIHU_LIVE_TESTS=1 node --test tests/live.test.js",
-    "check": "node --check scripts/cli.js && node --check scripts/lib/*.js && node --check tests/*.test.js",
+    "check": "node --check scripts/cli.js && node --check scripts/release.js && node --check scripts/lib/*.js && node --check tests/*.test.js",
     "verify:pack": "node scripts/verify-pack.js",
+    "release": "node scripts/release.js",
     "prepack": "pnpm check"
   },
   "dependencies": {
