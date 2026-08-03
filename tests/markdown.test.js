@@ -11,6 +11,24 @@ test('normalizes heading levels and renders supported blocks', () => {
   assert.match(html, /<pre lang="js">alert\('&lt;x&gt;'\)\n<\/pre>/);
 });
 
+test('normalizes heading levels by distinct relative depth for all boundary shapes', () => {
+  const cases = [
+    ['# one', '<h2>one</h2>'],
+    ['###### six', '<h2>six</h2>'],
+    ['# one\n\n## two\n\n### three', '<h2>one</h2><h3>two</h3><p><strong>three</strong></p>'],
+    ['## two\n\n#### four\n\n###### six', '<h2>two</h2><h3>four</h3><p><strong>six</strong></p>'],
+    ['#### four\n\n## two\n\n###### six\n\n## two again', '<h3>four</h3><h2>two</h2><p><strong>six</strong></p><h2>two again</h2>'],
+  ];
+  for (const [markdown, expected] of cases) assert.equal(compileMarkdown(markdown).html, expected);
+});
+
+test('heading normalization preserves inline markup and leaves documents without headings unchanged', () => {
+  const heading = compileMarkdown('###### [link](https://www.zhihu.com) `code` *emphasis*').html;
+  assert.equal(heading, '<h2><a href="https://www.zhihu.com">link</a> <code>code</code> <em>emphasis</em></h2>');
+  assert.equal(compileMarkdown('').html, '');
+  assert.equal(compileMarkdown('plain **bold**').html, '<p>plain <strong>bold</strong></p>');
+});
+
 test('renders inline and block equations as Zhihu equation images', () => {
   const { html } = compileMarkdown('行内 $1/2$\n\n$$\nE=mc^2\n$$');
   assert.match(html, /eeimg="1"[^>]+tex=1%2F2[^>]+alt="1\/2"/);

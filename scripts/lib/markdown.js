@@ -103,6 +103,22 @@ function markPlugin(md) {
   });
 }
 
+export function normalizeHeadingTokens(tokens) {
+  const levels = [...new Set(tokens
+    .filter((token) => token.type === 'heading_open')
+    .map((token) => Number(token.tag.slice(1))))]
+    .filter((level) => Number.isInteger(level))
+    .sort((a, b) => a - b);
+  if (levels.length === 0) return tokens;
+  const tags = new Map(levels.map((level, index) => [level, index === 0 ? 'h2' : index === 1 ? 'h3' : 'strong-paragraph']));
+  for (const token of tokens) {
+    if (token.type !== 'heading_open' && token.type !== 'heading_close') continue;
+    const tag = tags.get(Number(token.tag.slice(1)));
+    if (tag) token.meta = { ...(token.meta || {}), zhihuTag: tag };
+  }
+  return tokens;
+}
+
 function createRenderer(warnings) {
   const md = new MarkdownIt({ html: false, linkify: false, typographer: false, breaks: false });
   let unsafeLinkDepth = 0;
@@ -114,15 +130,7 @@ function createRenderer(warnings) {
   md.use(markPlugin);
 
   md.core.ruler.after('block', 'zhihu_heading_levels', (state) => {
-    const levels = [...new Set(state.tokens
-      .filter((token) => token.type === 'heading_open')
-      .map((token) => Number(token.tag.slice(1))))].sort((a, b) => a - b);
-    for (const token of state.tokens) {
-      if (token.type !== 'heading_open' && token.type !== 'heading_close') continue;
-      const level = Number(token.tag.slice(1));
-      const normalized = level === levels[0] ? 'h2' : level === levels[1] ? 'h3' : 'strong-paragraph';
-      token.meta = { ...(token.meta || {}), zhihuTag: normalized };
-    }
+    normalizeHeadingTokens(state.tokens);
   });
 
   md.renderer.rules.heading_open = (tokens, index) => {

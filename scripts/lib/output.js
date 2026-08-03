@@ -10,31 +10,60 @@ export function configureOutput({ format = 'json', verbose = false } = {}) {
   verboseEnabled = Boolean(verbose);
 }
 
-function compact(value) {
-  if (value === null || value === undefined) return '';
-  const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
-  return text.length > 180 ? `${text.slice(0, 177)}…` : text;
+function displayWidth(value) {
+  return [...value].reduce((width, character) => width + (/[^\u0000-\u00ff]/.test(character) ? 2 : 1), 0);
 }
 
-function tableText(data) {
+function truncate(value, maximum) {
+  if (displayWidth(value) <= maximum) return value;
+  let result = '';
+  for (const character of value) {
+    if (displayWidth(result) + displayWidth(character) > maximum - 1) break;
+    result += character;
+  }
+  return `${result}…`;
+}
+
+function compact(value, maximum = 180) {
+  if (value === null || value === undefined) return '';
+  const text = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  return truncate(text.replace(/[\r\n\t]+/g, ' '), maximum);
+}
+
+function schemaValue(item, column) {
+  const raw = typeof column.format === 'function' ? column.format(item?.[column.key], item) : item?.[column.key];
+  return compact(raw, column.width || 40);
+}
+
+function fitWidths(columns) {
+  const desired = columns.map((column) => column.width || 20);
+  const available = Math.max(40, (process.stdout.columns || 120) - (columns.length * 3 + 1));
+  const total = desired.reduce((sum, width) => sum + width, 0);
+  if (total <= available) return desired;
+  return desired.map((width) => Math.max(6, Math.floor(width * available / total)));
+}
+
+export function tableText(data, schema) {
   if (Array.isArray(data)) {
     if (data.length === 0) return '（无数据）\n';
-    const columns = [...new Set(data.flatMap((item) => item && typeof item === 'object' ? Object.keys(item) : ['value']))].slice(0, 8);
-    const table = new Table({ head: columns });
-    for (const item of data) table.push(columns.map((key) => compact(item && typeof item === 'object' ? item[key] : item)));
+    const columns = schema || [...new Set(data.flatMap((item) => item && typeof item === 'object' ? Object.keys(item) : ['value']))].slice(0, 8).map((key) => ({ key, label: key, width: 40 }));
+    const widths = fitWidths(columns);
+    const table = new Table({ head: columns.map((column) => column.label || column.key), colWidths: widths, wordWrap: false });
+    for (const item of data) table.push(columns.map((column, index) => schemaValue(item && typeof item === 'object' ? item : { value: item }, { ...column, width: widths[index] - 2 })));
     return `${table.toString()}\n`;
   }
   if (data && typeof data === 'object') {
     const table = new Table();
-    for (const [key, value] of Object.entries(data)) table.push({ [key]: compact(value) });
+    const entries = schema ? schema.map((column) => [column.label || column.key, schemaValue(data, column)]) : Object.entries(data).map(([key, value]) => [key, compact(value)]);
+    for (const [key, value] of entries) table.push({ [key]: value });
     return `${table.toString()}\n`;
   }
   return `${compact(data)}\n`;
 }
 
-export function success(data, { paging, warnings = [] } = {}) {
+export function success(data, { paging, warnings = [], table } = {}) {
   if (outputFormat === 'table') {
-    process.stdout.write(tableText(data));
+    process.stdout.write(tableText(data, table));
     if (paging !== undefined) process.stdout.write(`分页: ${compact(paging)}\n`);
     for (const warning of warnings) process.stderr.write(`警告: ${warning}\n`);
     return;
@@ -70,6 +99,7 @@ export function verbose(details) {
     attempt: details.attempt,
     durationMs: details.durationMs,
     retrying: details.retrying,
+    channel: details.channel,
   };
   process.stderr.write(outputFormat === 'table' ? `[http] ${compact(safe)}\n` : `${JSON.stringify({ debug: 'http', ...safe })}\n`);
 }

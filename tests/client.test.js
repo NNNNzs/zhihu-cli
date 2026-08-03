@@ -7,9 +7,11 @@ import {
   deleteContent,
   getAnswer,
   getAnswerComments,
+  getArticle,
   getFollowers,
   getFollowing,
   getHot,
+  getHotSearch,
   getNotifications,
   getQuestion,
   getQuestionAnswers,
@@ -55,7 +57,49 @@ test('read clients use bounded Zhihu endpoints and preserve pagination parameter
     assert.match(calls[11].url, /members\/alice\/followees/);
     assert.match(calls[13].url, /topics\/12\/feeds\/essence\?.*limit=5.*offset=4/);
     assert.match(calls[14].url, /notifications\/v2\/recent\?.*limit=5.*offset=4/);
+    assert.equal(calls[0].options.headers['x-requested-with'], 'fetch');
+    assert.equal(calls[1].options.headers['x-app-version'], '10.61.0');
+    assert.equal(calls[2].options.headers['x-app-version'], '10.61.0');
+    assert.equal(calls[3].options.headers['x-requested-with'], 'fetch');
     assert.equal(calls.every((call) => new URL(call.url).protocol === 'https:'), true);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('hot search uses the anonymous Android endpoint and bounded limit', async () => {
+  const original = globalThis.fetch;
+  let call;
+  globalThis.fetch = async (url, options) => {
+    call = { url: String(url), options };
+    return new Response('{"data":[]}');
+  };
+  try {
+    await getHotSearch(structuredClone(DEFAULT_CONFIG), { limit: 7 });
+    assert.match(call.url, /\/search\/top_search\/tabs\/hot\/items\?limit=7$/);
+    assert.equal(call.options.headers['x-app-version'], '10.61.0');
+    assert.equal(call.options.headers.cookie, undefined);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('article detail uses the column endpoint and one allowlisted Web fallback when content is absent', async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    calls.push(String(url));
+    return calls.length === 1
+      ? new Response('{"id":42,"title":"Article"}')
+      : new Response('{"id":42,"content":"<p>Body</p>"}');
+  };
+  try {
+    const result = await getArticle(structuredClone(DEFAULT_CONFIG), '42');
+    assert.equal(result.title, 'Article');
+    assert.equal(result.content, '<p>Body</p>');
+    assert.equal(calls.length, 2);
+    assert.match(calls[0], /zhuanlan\.zhihu\.com\/api\/articles\/42$/);
+    assert.match(calls[1], /www\.zhihu\.com\/api\/v4\/articles\/42\?include=/);
   } finally {
     globalThis.fetch = original;
   }

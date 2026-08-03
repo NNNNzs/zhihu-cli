@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import QRCode from 'qrcode';
 import { assertAllowedUrl } from './http.js';
-import { getConfigDirectory, getQrCodePath, saveCookies } from './config.js';
+import { getConfigDirectory, getQrCodePath, mergeCookies, saveCookies } from './config.js';
+import { absorbSetCookies } from './credentials.js';
 
 const BASE = 'https://www.zhihu.com';
 const QR_API = `${BASE}/api/v3/account/api/login/qrcode`;
@@ -16,22 +17,34 @@ export class LoginError extends Error {
   }
 }
 
-function cookieParts(value) {
-  if (!value) return [];
-  return value.split(/,(?=\s*[^;,=\s]+=[^;,]*)/g);
-}
+export { absorbSetCookies } from './credentials.js';
 
-export function absorbSetCookies(headers, cookies) {
-  const rawValues = typeof headers.getSetCookie === 'function'
-    ? headers.getSetCookie()
-    : [headers.get?.('set-cookie')];
-  const values = (rawValues || []).flatMap(cookieParts);
-  for (const value of values || []) {
-    const pair = value.split(';', 1)[0];
-    const separator = pair.indexOf('=');
-    if (separator <= 0) continue;
-    cookies[pair.slice(0, separator).trim()] = pair.slice(separator + 1).trim();
+export async function completeCookies(config, dependencies = {}) {
+  const request = dependencies.request || fetch;
+  const originalCookies = { ...(config.cookies || {}) };
+  const cookies = { ...originalCookies };
+  const before = new Set(Object.keys(cookies));
+  const endpoints = [
+    [`${BASE}/signin`, {}],
+    [`${BASE}/udid`, { method: 'POST', body: {} }],
+    [`${BASE}/`, {}],
+  ];
+  for (const [url, options] of endpoints) {
+    const response = await sessionRequest(cookies, url, { ...options, userAgent: config.userAgent, timeoutMs: 10_000 }, request);
+    if (response.status === 403 || response.status === 429) throw new LoginError(`Cookie 自动补全被知乎拒绝: HTTP ${response.status}`);
+    if (response.status >= 500) throw new LoginError(`Cookie 自动补全失败: HTTP ${response.status}`);
   }
+  const patch = {};
+  for (const name of new Set([...Object.keys(originalCookies), ...Object.keys(cookies)])) {
+    if (cookies[name] !== originalCookies[name]) patch[name] = Object.hasOwn(cookies, name) ? cookies[name] : null;
+  }
+  const saved = mergeCookies(patch);
+  return {
+    completed: REQUIRED.every((name) => cookies[name]),
+    addedCookieNames: saved.cookieNames.filter((name) => !before.has(name)),
+    missingCookieNames: REQUIRED.filter((name) => !cookies[name]),
+    cookieNames: saved.cookieNames,
+  };
 }
 
 function cookieHeader(cookies) {

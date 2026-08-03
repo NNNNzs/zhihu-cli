@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { clearAuthentication, cookieHeader, getConfigPath, loadConfig, parseCookieHeader, saveCookies } from '../scripts/lib/config.js';
+import { clearAuthentication, cookieHeader, getConfigPath, loadConfig, mergeCookies, parseCookieHeader, saveCookies } from '../scripts/lib/config.js';
 
 test('cookie parser preserves equals signs and skips attributes', () => {
   const cookies = parseCookieHeader('d_c0=abc==; z_c0=secret; Path=/; Secure; _xsrf=x');
@@ -41,6 +41,24 @@ test('saved config is private and loadable without exposing values', () => {
     assert.deepEqual(saved.cookieNames, ['d_c0', 'z_c0']);
     assert.equal(fs.statSync(saved.configPath).mode & 0o777, 0o600);
     assert.equal(loadConfig({ required: true }).cookies.d_c0, 'private');
+  } finally {
+    if (previous === undefined) delete process.env.ZHIHU_CLI_CONFIG;
+    else process.env.ZHIHU_CLI_CONFIG = previous;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('cookie merge adds and deletes values while preserving config fields and permissions', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhihu-config-merge-'));
+  const previous = process.env.ZHIHU_CLI_CONFIG;
+  process.env.ZHIHU_CLI_CONFIG = path.join(directory, 'config.json');
+  try {
+    saveCookies({ z_c0: 'session', obsolete: 'old' });
+    const result = mergeCookies({ _xsrf: 'token', obsolete: null });
+    assert.deepEqual(result.addedCookieNames, ['_xsrf']);
+    assert.deepEqual(result.removedCookieNames, ['obsolete']);
+    assert.deepEqual(loadConfig().cookies, { z_c0: 'session', _xsrf: 'token' });
+    assert.equal(fs.statSync(process.env.ZHIHU_CLI_CONFIG).mode & 0o777, 0o600);
   } finally {
     if (previous === undefined) delete process.env.ZHIHU_CLI_CONFIG;
     else process.env.ZHIHU_CLI_CONFIG = previous;

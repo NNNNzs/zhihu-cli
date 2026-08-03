@@ -107,11 +107,27 @@ export function loadConfig({ required = false } = {}) {
 
 export function saveCookies(cookies, { replace = false } = {}) {
   if (Object.keys(cookies).length === 0) throw new Error('stdin 中没有解析到 Cookie');
+  return mergeCookies(cookies, { replace });
+}
+
+export function mergeCookies(cookies, { replace = false } = {}) {
   const configPath = getConfigPath();
   const configDirectory = path.dirname(configPath);
   const existing = loadConfig();
-  const next = { ...existing, cookies: replace ? { ...cookies } : { ...existing.cookies, ...cookies } };
-  const temporaryPath = `${configPath}.${process.pid}.tmp`;
+  const merged = replace ? {} : { ...existing.cookies };
+  const addedCookieNames = [];
+  const removedCookieNames = [];
+  for (const [name, value] of Object.entries(cookies)) {
+    if (value === null || value === undefined || value === '') {
+      if (Object.hasOwn(merged, name)) removedCookieNames.push(name);
+      delete merged[name];
+    } else {
+      if (!Object.hasOwn(merged, name)) addedCookieNames.push(name);
+      merged[name] = String(value);
+    }
+  }
+  const next = { ...existing, cookies: merged };
+  const temporaryPath = `${configPath}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
 
   fs.mkdirSync(configDirectory, { recursive: true, mode: 0o700 });
   fs.chmodSync(configDirectory, 0o700);
@@ -119,7 +135,7 @@ export function saveCookies(cookies, { replace = false } = {}) {
   fs.chmodSync(temporaryPath, 0o600);
   fs.renameSync(temporaryPath, configPath);
   fs.chmodSync(configPath, 0o600);
-  return { configPath, cookieNames: Object.keys(next.cookies).sort() };
+  return { configPath, cookieNames: Object.keys(next.cookies).sort(), addedCookieNames: addedCookieNames.sort(), removedCookieNames: removedCookieNames.sort() };
 }
 
 export function clearAuthentication() {

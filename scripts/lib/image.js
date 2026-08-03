@@ -195,6 +195,18 @@ async function uploadGif(config, imageHash, bytes, token, requestRawFn) {
   });
 }
 
+export async function notifyUploadingStatus(config, imageId, requestRawFn = requestRaw) {
+  const response = await requestRawFn(config, `https://api.zhihu.com/images/${imageId}/uploading_status`, {
+    method: 'PUT',
+    retries: 0,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ upload_result: 'success' }),
+  });
+  if (response && (response.status < 200 || response.status >= 300)) {
+    throw new Error(`图片上传状态通知失败: HTTP ${response.status}`);
+  }
+}
+
 export async function uploadImage(config, filePath, dependencies = {}) {
   const requestJsonFn = dependencies.requestJson || requestJson;
   const requestRawFn = dependencies.requestRaw || requestRaw;
@@ -222,12 +234,7 @@ export async function uploadImage(config, filePath, dependencies = {}) {
     if (!token.accessId || !token.accessKey || !token.accessToken) throw new Error('知乎返回的 upload_token 字段不完整');
     if (mimeType === 'image/gif') await uploadGif(config, imageHash, bytes, token, requestRawFn);
     else await uploadSingle(config, imageHash, bytes, mimeType, token, requestRawFn);
-    await requestRawFn(config, `https://api.zhihu.com/images/${imageId}/uploading_status`, {
-      method: 'PUT',
-      retries: 0,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ upload_result: 'success' }),
-    });
+    await notifyUploadingStatus(config, imageId, requestRawFn);
   }
 
   let status;

@@ -40,9 +40,12 @@ pbpaste | zhihu auth import
 
 # 已有本地文件
 zhihu auth import < cookies.txt
+zhihu auth repair
 ```
 
 当前知乎二维码登录接口会返回 HTTP 403，因此二维码不再作为推荐方案。保留 `zhihu auth login --qr` 与兼容别名 `zhihu login --qrcode` 仅供接口恢复后的人工排障；不要让 Agent 转发二维码、二维码 URL 或 token。
+
+`auth import` 会尝试访问知乎初始化页补全 `_xsrf`、`d_c0` 等 Cookie；失败时保留已导入值并返回 warning。可用 `--no-repair` 跳过联网补全。Web 响应中的 Cookie 会原子滚动回写；没有可靠的 Web refresh-token 协议，401 后请先 `auth repair`，仍失败则重新扫码。
 
 登录态保存在 `~/.zhihu-cli/config.json`，目录和文件权限分别为 `0700`、`0600`。旧 `~/.zhihu-creator/config.json` 与 `ZHIHU_CREATOR_CONFIG` 只做兼容读取；新覆盖变量为 `ZHIHU_CLI_CONFIG`。
 
@@ -64,6 +67,8 @@ zhihu search --query "人工智能" --type topic
 zhihu search --query "Node.js" --questions-only --answers 3
 
 zhihu feed hot --limit 20 --answers 2
+zhihu feed hot-search --limit 20
+zhihu hot-search --limit 20
 zhihu feed recommend --limit 10 --expand --comments 3
 zhihu feeds --limit 10 --comment-limit 3
 
@@ -72,6 +77,7 @@ zhihu question answers 12345678 --limit 10 --sort default
 zhihu answer 87654321
 zhihu answer comments 87654321 --limit 20
 zhihu answer comments 87654321 --all
+zhihu article show 123456
 
 zhihu user somebody
 zhihu user answers somebody

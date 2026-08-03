@@ -1,5 +1,6 @@
 import { Agent, ProxyAgent } from 'undici';
 import { cookieHeader } from './config.js';
+import { rollResponseCookies } from './credentials.js';
 import { signRequest } from './zse-signer.js';
 
 const ALLOWED_HOSTS = new Set([
@@ -23,6 +24,13 @@ export const ANDROID_HEADERS = Object.freeze({
   'x-app-za': 'OS=Android&Release=12&Model=sdk_gphone64_arm64&VersionName=10.61.0&VersionCode=26107&Product=com.zhihu.android&Width=1440&Height=2952&DeviceType=AndroidPhone&Brand=google',
   'user-agent': 'com.zhihu.android/Futureve/10.61.0 Mozilla/5.0 (Linux; Android 12; sdk_gphone64_arm64 Build/SE1A.220630.001.A1; wv) AppleWebKit/537.36 Mobile Safari/537.36',
 });
+
+export const API_CHANNELS = Object.freeze({ WEB: 'web', ANDROID: 'android' });
+const CHANNEL_HEADER_NAMES = new Set(['authorization', 'cookie', 'user-agent', 'x-api-version', 'x-app-version', 'x-app-za', 'x-requested-with', 'x-zse-93', 'x-zse-96']);
+
+function callerHeaders(headers = {}) {
+  return Object.fromEntries(Object.entries(headers).filter(([name]) => !CHANNEL_HEADER_NAMES.has(name.toLowerCase())));
+}
 
 function dispatcherFor(config) {
   const proxy = config.proxy;
@@ -64,13 +72,13 @@ function safeJsonError(parsed) {
   return Object.keys(result).length > 0 ? JSON.stringify(result) : '[response body omitted]';
 }
 
-function buildHeaders(config, url, { headers = {}, bodyText = null, signed = false } = {}) {
+function buildHeaders(config, url, { headers = {}, bodyText = null, signed = false, includeCookies = true } = {}) {
   const result = {
     'user-agent': config.userAgent,
     accept: 'application/json, text/plain, */*',
     ...headers,
   };
-  const cookies = cookieHeader(config.cookies || {});
+  const cookies = includeCookies ? cookieHeader(config.cookies || {}) : '';
   if (cookies) result.cookie = cookies;
   if (signed) {
     result['x-zse-93'] = config.zse93;
@@ -102,7 +110,7 @@ export async function requestRaw(config, value, options = {}) {
     try {
       response = await fetch(url, {
         method,
-        headers: buildHeaders(config, url, { headers, bodyText, signed: options.signed }),
+        headers: buildHeaders(config, url, { headers, bodyText, signed: options.signed, includeCookies: options.includeCookies !== false }),
         body,
         dispatcher: options.dispatcher || dispatcherFor(config),
         redirect: 'manual',
@@ -117,7 +125,9 @@ export async function requestRaw(config, value, options = {}) {
       throw new HttpError(`网络请求失败: ${error.message}`, { method, url: url.toString() });
     }
 
-    httpLogger?.({ method, url: url.toString(), attempt, status: response.status, durationMs: Date.now() - startedAt, retrying: attempt < retries && (response.status === 429 || response.status >= 500) });
+    httpLogger?.({ method, url: url.toString(), channel: options.channel || null, attempt, status: response.status, durationMs: Date.now() - startedAt, retrying: attempt < retries && (response.status === 429 || response.status >= 500) });
+
+    if (options.channel === API_CHANNELS.WEB) rollResponseCookies(config, response);
 
     if (response.ok) return response;
     const text = await response.text();
@@ -128,7 +138,7 @@ export async function requestRaw(config, value, options = {}) {
       continue;
     }
     throw new HttpError(
-      `知乎请求失败: HTTP ${response.status}${parsed?.message ? ` ${parsed.message}` : ''}`,
+      `知乎请求失败: HTTP ${response.status}${parsed?.message ? ` ${parsed.message}` : ''}${response.status === 401 ? '；凭证已失效，请运行 auth repair，仍失败则重新扫码登录' : ''}`,
       {
         status: response.status,
         method,
@@ -155,4 +165,32 @@ export async function requestJson(config, value, options = {}) {
       responseSnippet: safeResponseSnippet(text),
     });
   }
+}
+
+export function requestWebRaw(config, value, options = {}) {
+  return requestRaw(config, value, {
+    ...options,
+    channel: API_CHANNELS.WEB,
+    includeCookies: true,
+    headers: { ...callerHeaders(options.headers), 'x-requested-with': 'fetch' },
+  });
+}
+
+export function requestWebJson(config, value, options = {}) {
+  return requestJson(config, value, {
+    ...options,
+    channel: API_CHANNELS.WEB,
+    includeCookies: true,
+    headers: { ...callerHeaders(options.headers), 'x-requested-with': 'fetch' },
+  });
+}
+
+export function requestAndroidJson(config, value, options = {}) {
+  return requestJson(config, value, {
+    ...options,
+    channel: API_CHANNELS.ANDROID,
+    signed: false,
+    includeCookies: false,
+    headers: { ...callerHeaders(options.headers), ...ANDROID_HEADERS },
+  });
 }

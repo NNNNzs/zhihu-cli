@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { absorbSetCookies, qrLogin } from '../scripts/lib/auth.js';
-import { loadConfig } from '../scripts/lib/config.js';
+import { absorbSetCookies, completeCookies, qrLogin } from '../scripts/lib/auth.js';
+import { loadConfig, saveCookies } from '../scripts/lib/config.js';
 
 function jsonResponse(data, { status = 200, cookies = [] } = {}) {
   const headers = new Headers({ 'content-type': 'application/json' });
@@ -13,11 +13,64 @@ function jsonResponse(data, { status = 200, cookies = [] } = {}) {
 }
 
 test('absorbs combined Set-Cookie values without retaining attributes', () => {
-  const cookies = {};
-  absorbSetCookies(new Headers({ 'set-cookie': '_xsrf=x; Path=/, d_c0=device; Expires=Wed, 21 Oct 2030 07:28:00 GMT; Path=/' }), cookies);
+  const cookies = { obsolete: 'old' };
+  absorbSetCookies(new Headers({ 'set-cookie': '_xsrf=x; Path=/, d_c0=device; Expires=Wed, 21 Oct 2030 07:28:00 GMT; Path=/, obsolete=; Max-Age=0; Path=/' }), cookies);
   assert.equal(cookies._xsrf, 'x');
   assert.equal(cookies.d_c0, 'device');
   assert.equal(cookies.Expires, undefined);
+  assert.equal(cookies.obsolete, undefined);
+});
+
+test('cookie completion adds required names without exposing or replacing the session', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhihu-cookie-complete-'));
+  const previous = process.env.ZHIHU_CLI_CONFIG;
+  process.env.ZHIHU_CLI_CONFIG = path.join(directory, 'config.json');
+  const requests = [];
+  try {
+    saveCookies({ z_c0: 'session' });
+    const result = await completeCookies(loadConfig(), {
+      request: async (url, options) => {
+        requests.push({ url: String(url), cookie: options.headers.cookie });
+        if (String(url).endsWith('/signin')) return jsonResponse({}, { cookies: ['_xsrf=token; Path=/'] });
+        if (String(url).endsWith('/udid')) return jsonResponse({}, { cookies: ['d_c0=device; Path=/'] });
+        return jsonResponse({});
+      },
+    });
+    assert.equal(result.completed, true);
+    assert.deepEqual(result.addedCookieNames, ['_xsrf', 'd_c0']);
+    assert.deepEqual(result.missingCookieNames, []);
+    assert.equal(loadConfig().cookies.z_c0, 'session');
+    assert.match(requests[1].cookie, /_xsrf=token/);
+    assert.doesNotMatch(JSON.stringify(result), /session|token|device/);
+  } finally {
+    if (previous === undefined) delete process.env.ZHIHU_CLI_CONFIG;
+    else process.env.ZHIHU_CLI_CONFIG = previous;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('cookie completion only persists its cookie diff', async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhihu-cookie-diff-'));
+  const previous = process.env.ZHIHU_CLI_CONFIG;
+  process.env.ZHIHU_CLI_CONFIG = path.join(directory, 'config.json');
+  try {
+    saveCookies({ z_c0: 'session', retained: 'original' });
+    await completeCookies(loadConfig(), {
+      request: async (url) => {
+        if (String(url).endsWith('/signin')) {
+          saveCookies({ retained: 'concurrent' });
+          return jsonResponse({}, { cookies: ['_xsrf=token; Path=/'] });
+        }
+        if (String(url).endsWith('/udid')) return jsonResponse({}, { cookies: ['d_c0=device; Path=/'] });
+        return jsonResponse({});
+      },
+    });
+    assert.equal(loadConfig().cookies.retained, 'concurrent');
+  } finally {
+    if (previous === undefined) delete process.env.ZHIHU_CLI_CONFIG;
+    else process.env.ZHIHU_CLI_CONFIG = previous;
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('QR login handles unscanned, scanned, confirmed and saves private cookies', async () => {

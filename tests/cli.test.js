@@ -7,12 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const packageJson = JSON.parse(fs.readFileSync(path.join(projectDirectory, 'package.json'), 'utf8'));
 
 test('CLI exposes the competitor aliases and grouped P0-P4 commands', async () => {
   const { createProgram } = await import('../scripts/cli.js');
   const program = createProgram();
   const topLevel = new Set(program.commands.map((command) => command.name()));
-  for (const name of ['login', 'logout', 'status', 'whoami', 'search', 'hot', 'question', 'answers', 'answer', 'feed', 'feeds', 'topic', 'user', 'user-answers', 'user-articles', 'followers', 'following', 'vote', 'follow-question', 'ask', 'pin', 'article', 'delete-question', 'delete-pin', 'delete-article', 'collections', 'notifications']) {
+  for (const name of ['login', 'logout', 'status', 'whoami', 'search', 'hot', 'hot-search', 'question', 'answers', 'answer', 'feed', 'feeds', 'topic', 'user', 'user-answers', 'user-articles', 'followers', 'following', 'vote', 'follow-question', 'ask', 'pin', 'article', 'delete-question', 'delete-pin', 'delete-article', 'collections', 'notifications']) {
     assert.equal(topLevel.has(name), true, `missing ${name}`);
   }
   const question = program.commands.find((command) => command.name() === 'question');
@@ -21,6 +22,12 @@ test('CLI exposes the competitor aliases and grouped P0-P4 commands', async () =
   assert.equal(question.commands.some((command) => command.name() === 'follow'), true);
   assert.equal(answer.commands.some((command) => command.name() === 'comments'), true);
   assert.equal(answer.commands.some((command) => command.name() === 'vote'), true);
+  const feed = program.commands.find((command) => command.name() === 'feed');
+  assert.equal(feed.commands.some((command) => command.name() === 'hot-search'), true);
+  const article = program.commands.find((command) => command.name() === 'article');
+  assert.equal(article.commands.some((command) => command.name() === 'show'), true);
+  assert.equal(article.commands.some((command) => command.name() === 'create'), true);
+  assert.equal(article.commands.some((command) => command.name() === 'delete'), true);
 });
 
 test('Skill metadata identifies the npm package, canonical command, and release version', () => {
@@ -65,7 +72,7 @@ test('pnpm command keeps failure stdout empty and stderr as JSON', () => {
 test('auth import reads a piped Cookie header without a redundant flag', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhihu-cli-test-'));
   try {
-    const result = spawnSync(process.execPath, ['scripts/cli.js', 'auth', 'import'], {
+    const result = spawnSync(process.execPath, ['scripts/cli.js', 'auth', 'import', '--no-repair'], {
       cwd: projectDirectory,
       input: 'd_c0=private; z_c0=session; _xsrf=token',
       encoding: 'utf8',
@@ -80,14 +87,20 @@ test('auth import reads a piped Cookie header without a redundant flag', () => {
   }
 });
 
-test('version, offline status, and table output are available without network access', () => {
+test('both version flags print only the exact package version', () => {
+  for (const flag of ['--version', '-V']) {
+    const result = spawnSync(process.execPath, ['scripts/cli.js', flag], { cwd: projectDirectory, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, `${packageJson.version}\n`);
+    assert.equal(result.stderr, '');
+  }
+});
+
+test('offline status and table output are available without network access', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhihu-cli-human-'));
   const configPath = path.join(directory, 'config.json');
   fs.writeFileSync(configPath, JSON.stringify({ cookies: { z_c0: 'session' } }), { mode: 0o600 });
   try {
-    const version = spawnSync(process.execPath, ['scripts/cli.js', '--version'], { cwd: projectDirectory, encoding: 'utf8' });
-    assert.equal(version.status, 0);
-    assert.match(version.stdout, /^\d+\.\d+\.\d+/);
     const status = spawnSync(process.execPath, ['scripts/cli.js', 'auth', 'status', '--offline'], { cwd: projectDirectory, encoding: 'utf8', env: { ...process.env, ZHIHU_CLI_CONFIG: configPath } });
     assert.equal(JSON.parse(status.stdout).data.verifiedOnline, false);
     const table = spawnSync(process.execPath, ['scripts/cli.js', '--format', 'table', 'answer', 'compile', '--input', '-'], { cwd: projectDirectory, input: '# 标题\n', encoding: 'utf8' });

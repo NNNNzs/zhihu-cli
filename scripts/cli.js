@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Command, CommanderError } from 'commander';
-import { qrLogin } from './lib/auth.js';
+import { completeCookies, qrLogin } from './lib/auth.js';
 import {
   clearAuthentication,
   loadConfig,
@@ -15,10 +15,12 @@ import {
 import {
   getAnswer,
   getAnswerComments,
+  getArticle,
   getCollections,
   getFollowers,
   getFollowing,
   getHot,
+  getHotSearch,
   getMe,
   getNotifications,
   getQuestion,
@@ -109,6 +111,31 @@ export function normalizeFeedItem(item) {
     hotValue: target.metrics_area?.text || null,
     url: linkUrl || (question?.id ? `https://www.zhihu.com/question/${question.id}` : null),
   };
+}
+
+export function normalizeHotSearchItem(item, index = 0) {
+  const target = item?.target ?? item?.object ?? item;
+  const query = target?.query ?? target?.keyword ?? target?.search_query ?? target?.searchQuery ?? target?.title ?? '';
+  if (typeof query !== 'string' || !query.trim()) return null;
+  const normalizedQuery = query.trim();
+  const actionUrl = target?.url ?? target?.link?.url ?? target?.search_action?.url ?? target?.searchAction?.url ?? null;
+  return {
+    rank: target?.rank ?? item?.rank ?? index + 1,
+    query: normalizedQuery,
+    displayQuery: target?.display_query ?? target?.displayQuery ?? target?.display_text ?? normalizedQuery,
+    hotValue: target?.hot_value ?? target?.hotValue ?? target?.heat ?? target?.metrics_area?.text ?? null,
+    url: actionUrl || `https://www.zhihu.com/search?q=${encodeURIComponent(normalizedQuery)}`,
+  };
+}
+
+function normalizeHotSearch(response, limit) {
+  const raw = Array.isArray(response) ? response : response?.data ?? response?.items ?? response?.hot_search ?? [];
+  const seen = new Set();
+  return raw.map(normalizeHotSearchItem).filter((item) => {
+    if (!item || seen.has(item.query)) return false;
+    seen.add(item.query);
+    return true;
+  }).slice(0, limit);
 }
 
 function childNodes(node) {
@@ -243,12 +270,14 @@ function normalizeComment(raw) {
   };
 }
 
-function normalizeArticle(raw) {
+export function normalizeArticle(raw) {
   return {
-    id: raw?.id === undefined ? null : String(raw.id), title: raw?.title || '', excerpt: raw?.excerpt || '',
-    author: raw?.author ? compactAccount(raw.author) : null, voteupCount: raw?.voteup_count ?? null,
-    commentCount: raw?.comment_count ?? null, createdTime: raw?.created_time ?? null, updatedTime: raw?.updated_time ?? null,
-    url: raw?.id ? `https://zhuanlan.zhihu.com/p/${raw.id}` : null,
+    id: raw?.id === undefined ? null : String(raw.id), title: raw?.title || '', content: raw?.content || '', excerpt: raw?.excerpt || '',
+    author: raw?.author ? compactAccount(raw.author) : null, voteupCount: raw?.voteup_count ?? raw?.voteupCount ?? null,
+    commentCount: raw?.comment_count ?? raw?.commentCount ?? null, createdTime: raw?.created_time ?? raw?.createdTime ?? null,
+    updatedTime: raw?.updated_time ?? raw?.updatedTime ?? null,
+    topics: (raw?.topics || []).map((topic) => ({ id: topic?.id === undefined ? null : String(topic.id), name: topic?.name || '', urlToken: topic?.url_token ?? topic?.urlToken ?? null })),
+    url: raw?.url || (raw?.id ? `https://zhuanlan.zhihu.com/p/${raw.id}` : null),
   };
 }
 
@@ -341,12 +370,45 @@ function addListOptions(command, defaultLimit = 10) {
   return command.option('-l, --limit <number>', '每页数量', String(defaultLimit)).option('--offset <number>', '起始偏移', '0');
 }
 
+const FEED_TABLE = [
+  { key: 'type', label: '类型', width: 10 }, { key: 'title', label: '标题', width: 34 },
+  { key: 'hotValue', label: '热度', width: 16 }, { key: 'answerCount', label: '回答', width: 8 },
+  { key: 'url', label: '链接', width: 42 },
+];
+const HOT_SEARCH_TABLE = [
+  { key: 'rank', label: '序号', width: 8 }, { key: 'displayQuery', label: '热搜词', width: 34 },
+  { key: 'hotValue', label: '热度', width: 16 }, { key: 'url', label: '链接', width: 48 },
+];
+const SEARCH_TABLE = [
+  { key: 'type', label: '类型', width: 10 }, { key: 'title', label: '标题', width: 34 },
+  { key: 'excerpt', label: '摘要', width: 40 }, { key: 'url', label: '链接', width: 42 },
+];
+const ARTICLE_TABLE = [
+  { key: 'id', label: 'ID', width: 18 }, { key: 'title', label: '标题', width: 60 },
+  { key: 'author', label: '作者', width: 30, format: (value) => value?.name || '' },
+  { key: 'content', label: '正文', width: 80, format: (value = '') => `${[...value].length} 字符：${value.replace(/<[^>]+>/g, ' ')}` },
+  { key: 'voteupCount', label: '赞同', width: 16 }, { key: 'commentCount', label: '评论', width: 16 },
+  { key: 'url', label: '链接', width: 80 },
+];
+let articleCommand;
+const USER_TABLE = [
+  { key: 'name', label: '姓名', width: 24 }, { key: 'urlToken', label: 'url_token', width: 28 },
+  { key: 'headline', label: '简介', width: 48 }, { key: 'followerCount', label: '关注者', width: 14 },
+];
+
 function registerAuth(program) {
   const auth = program.command('auth').description('认证与登录态');
-  auth.command('import').description('仅从 stdin 导入 Cookie').action(async () => {
+  auth.command('import').description('从 stdin 导入 Cookie 并自动补全').option('--no-repair', '跳过联网补全').action(async (options) => {
     const result = saveCookies(parseCookieHeader(await readStdin()));
-    success({ imported: true, configPath: result.configPath, cookieNames: result.cookieNames });
+    if (!options.repair) return success({ imported: true, completed: false, configPath: result.configPath, cookieNames: result.cookieNames });
+    try {
+      const completed = await completeCookies(loadConfig({ required: true }));
+      success({ imported: true, configPath: result.configPath, ...completed });
+    } catch (error) {
+      success({ imported: true, completed: false, configPath: result.configPath, cookieNames: result.cookieNames }, { warnings: [`Cookie 自动补全失败，请稍后运行 auth repair: ${error.message}`] });
+    }
   });
+  auth.command('repair').description('补全已有 Cookie').action(async () => success(await completeCookies(authConfig('补全 Cookie'))));
   auth.command('login').option('--qr', '使用二维码登录').action(async (options, command) => {
     if (!options.qr) throw new UsageError('auth login 目前仅支持 --qr');
     const global = command.optsWithGlobals();
@@ -392,13 +454,13 @@ function registerReadCommands(program) {
     let data = listResponse(response).data.map(normalizeSearchItem).filter((item) => !options.questionsOnly || item.type === 'question');
     const answers = integer(options.answers, '--answers', 0, { min: 0, max: 10 });
     if (answers) data = await Promise.all(data.map(async (item) => item.type !== 'question' ? item : ({ ...item, answers: listResponse(await getQuestionAnswers(config, item.id, { limit: answers })).data.map(normalizeAnswer).filter(Boolean) })));
-    success(data, { paging: response?.paging ?? null });
+    success(data, { paging: response?.paging ?? null, table: SEARCH_TABLE });
   });
 
   const feed = program.command('feed').description('推荐和热榜').option('-l, --limit <number>', '数量', '10').action(async (options) => {
     const config = authConfig('读取个性化推荐');
     const response = await getRecommend(config, { limit: integer(options.limit, '--limit', 10, { min: 1, max: 50 }) });
-    success(uniqueFeedItems(listResponse(response).data.map((item) => item.type === 'ComponentCard' ? normalizeComponentCard(item) : normalizeFeedItem(item))));
+    success(uniqueFeedItems(listResponse(response).data.map((item) => item.type === 'ComponentCard' ? normalizeComponentCard(item) : normalizeFeedItem(item))), { table: FEED_TABLE });
   });
   for (const kind of ['hot', 'recommend']) {
     feed.command(kind).option('-l, --limit <number>', '数量', kind === 'hot' ? '20' : '10').option('--answers <number>', '展开回答数', '0').option('--expand', '展开回答正文').option('--comments <number>', '展开评论数', '0').action(async (options) => {
@@ -406,15 +468,22 @@ function registerReadCommands(program) {
       const config = kind === 'hot' ? loadConfig() : authConfig('读取个性化推荐');
       const response = kind === 'hot' ? await getHot(config, { limit }) : await getRecommend(config, { limit });
       const normalized = uniqueFeedItems(listResponse(response).data.map((item) => item.type === 'ComponentCard' ? normalizeComponentCard(item) : normalizeFeedItem(item))).slice(0, limit);
-      success(await expandFeed(config, normalized, options), { paging: response?.paging ?? null });
+      success(await expandFeed(config, normalized, options), { paging: response?.paging ?? null, table: FEED_TABLE });
     });
   }
+  const hotSearchAction = async (options) => {
+    const limit = integer(options.limit, '--limit', 20, { min: 1, max: 50 });
+    const response = await getHotSearch(loadConfig(), { limit });
+    success(normalizeHotSearch(response, limit), { paging: response?.paging ?? null, table: HOT_SEARCH_TABLE });
+  };
+  feed.command('hot-search').option('-l, --limit <number>', '数量', '20').action(hotSearchAction);
+  program.command('hot-search').option('-l, --limit <number>', '数量', '20').action(hotSearchAction);
   program.command('hot').option('-l, --limit <number>', '数量', '20').option('--answers <number>', '展开回答数', '0').action(async (options) => {
     const config = loadConfig();
     const limit = integer(options.limit, '--limit', 20, { min: 1, max: 50 });
     const response = await getHot(config, { limit });
     const normalized = uniqueFeedItems(listResponse(response).data.map((item) => item.type === 'ComponentCard' ? normalizeComponentCard(item) : normalizeFeedItem(item))).slice(0, limit);
-    success(await expandFeed(config, normalized, options), { paging: response?.paging ?? null });
+    success(await expandFeed(config, normalized, options), { paging: response?.paging ?? null, table: FEED_TABLE });
   });
   program.command('feeds').option('-l, --limit <number>', '数量', '10').option('--comment-limit <number>', '每项评论数', '3').action(async (options) => {
     const config = authConfig('读取个性化推荐');
@@ -453,8 +522,8 @@ function registerReadCommands(program) {
     success(listResponse(response).data.map(normalizeComment), { paging: response?.paging ?? null });
   });
 
-  const user = program.command('user').argument('[token]').action(async (token) => { if (!token) throw new UsageError('缺少用户 url_token'); success(normalizeUser(await getUser(loadConfig(), token))); });
-  user.command('show').argument('<token>').action(async (token) => success(normalizeUser(await getUser(loadConfig(), token))));
+  const user = program.command('user').argument('[token]').action(async (token) => { if (!token) throw new UsageError('缺少用户 url_token'); success(normalizeUser(await getUser(loadConfig(), token)), { table: USER_TABLE }); });
+  user.command('show').argument('<token>').action(async (token) => success(normalizeUser(await getUser(loadConfig(), token)), { table: USER_TABLE }));
   for (const kind of ['answers', 'articles', 'followers', 'following']) {
     addListOptions(user.command(kind).argument('<token>').option('--sort <sort>', '排序', 'created')).action(async (token, options) => {
       const config = loadConfig();
@@ -468,6 +537,8 @@ function registerReadCommands(program) {
   program.command('user-articles').argument('<token>').option('-l, --limit <number>', '数量', '10').action(async (token, options) => { const response = await getUserArticles(loadConfig(), token, { limit: integer(options.limit, '--limit', 10, { min: 1, max: 50 }) }); success(listResponse(response).data.map(normalizeArticle), { paging: response?.paging ?? null }); });
   program.command('followers').argument('<token>').option('-l, --limit <number>', '数量', '10').action(async (token, options) => { const response = await getFollowers(loadConfig(), token, { limit: integer(options.limit, '--limit', 10, { min: 1, max: 50 }) }); success(listResponse(response).data.map(normalizeUser), { paging: response?.paging ?? null }); });
   program.command('following').argument('<token>').option('-l, --limit <number>', '数量', '10').action(async (token, options) => { const response = await getFollowing(loadConfig(), token, { limit: integer(options.limit, '--limit', 10, { min: 1, max: 50 }) }); success(listResponse(response).data.map(normalizeUser), { paging: response?.paging ?? null }); });
+
+  articleCommand.command('show').argument('<id>').action(async (id) => success(normalizeArticle(await getArticle(loadConfig(), positiveId(id, '文章 ID'))), { table: ARTICLE_TABLE }));
 
   const topic = program.command('topic').argument('[id]').action(async (id, options) => { const raw = await getTopic(loadConfig(), resolvedId(id, options, '话题 ID')); success({ id: String(raw.id || id), name: raw.name || '', introduction: raw.introduction || '', followersCount: raw.followers_count ?? null, questionsCount: raw.questions_count ?? null }); });
   topic.command('show').argument('[id]').option('--id <id>').action(async (id, options) => { const topicId = resolvedId(id, options, '话题 ID'); const raw = await getTopic(loadConfig(), topicId); success({ id: String(raw.id || topicId), name: raw.name || '', introduction: raw.introduction || '', followersCount: raw.followers_count ?? null, questionsCount: raw.questions_count ?? null }); });
@@ -526,7 +597,7 @@ function registerWriteCommands(program) {
   follow.command('apply').argument('<id>').option('--unfollow').requiredOption('--confirm <sha256>').action(async (id, options) => success(await applyFollow(authConfig('执行关注操作', ['d_c0', 'z_c0', '_xsrf']), positiveId(id, '问题 ID'), !options.unfollow, options.confirm)));
   program.command('follow-question').argument('<id>').option('--unfollow').option('--confirm <sha256>').action(async (id, options) => { const config = authConfig('关注操作'); const desired = !options.unfollow; success(options.confirm ? await applyFollow(config, positiveId(id, '问题 ID'), desired, options.confirm) : await previewFollow(config, positiveId(id, '问题 ID'), desired)); });
 
-  for (const [type, parent] of [['question', question], ['pin', program.command('pin')], ['article', program.command('article')]]) {
+  for (const [type, parent] of [['question', question], ['pin', program.command('pin')], ['article', articleCommand]]) {
     const create = parent.command('create');
     for (const action of ['preview', 'publish']) {
       const command = addContentOptions(create.command(action), { title: true, topics: type !== 'pin' });
@@ -564,7 +635,7 @@ function registerWriteCommands(program) {
 
 export function createProgram() {
   const program = new Command();
-  program.name('zhihu').description('面向人类与 Agent 的知乎 CLI').version(packageJson.version)
+  program.name('zhihu').description('面向人类与 Agent 的知乎 CLI').version(packageJson.version, '-V, --version')
     .option('--format <format>', '输出格式 json|table', 'json').option('--verbose', '输出脱敏 HTTP 调试日志');
   program.exitOverride().showSuggestionAfterError(true).configureOutput({ writeErr: () => {} });
   program.hook('preAction', (_thisCommand, actionCommand) => {
@@ -572,6 +643,7 @@ export function createProgram() {
     configureOutput({ format: options.format, verbose: options.verbose });
     setHttpLogger(verbose);
   });
+  articleCommand = program.command('article').description('文章');
   registerAuth(program);
   registerReadCommands(program);
   registerAnswerWriting(program);
