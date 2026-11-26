@@ -22,8 +22,9 @@
 - 临时二维码：`~/.zhihu-cli/login_qrcode.png`，权限 `0600`，流程结束即删除。
 - 兼容读取：`~/.zhihu-creator/config.json`、`ZHIHU_CREATOR_CONFIG`。
 - 当前覆盖变量：`ZHIHU_CLI_CONFIG`。
-- `zhihu-cli auth import` 在交互终端提示用户粘贴一行 Cookie 并按回车，输入不回显。也支持通过标准输入管道或重定向导入，不接受 Cookie 参数。默认补全 Cookie，`--no-repair` 可跳过，`auth repair` 可显式重试。
+- `zhihu-cli auth import` 在交互终端提示用户粘贴一行 Cookie 并按回车，输入不回显。浏览器取值步骤见 [登录指南](../README.md#登录)。也支持通过标准输入管道或重定向导入，不接受 Cookie 参数。默认补全 Cookie，`--no-repair` 可跳过，`auth repair` 可显式重试。
 - `auth login --qr` 最长等待 120 秒，未扫码时每秒轮询，已扫码时每 0.5 秒轮询。
+- 遇到 HTTP 401、403 或 429 时停止二维码状态轮询。若请求被知乎拒绝，请使用官网扫码登录，再通过 `zhihu-cli auth import` 导入 Cookie。
 - `auth status --offline` 不联网；在线 status 和 whoami 以 `/api/v4/me` 为准。
 - logout 清空新旧配置登录态并删除二维码。
 

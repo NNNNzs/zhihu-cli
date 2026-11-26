@@ -396,6 +396,15 @@ const USER_TABLE = [
   { key: 'headline', label: '简介', width: 48 }, { key: 'followerCount', label: '关注者', width: 14 },
 ];
 
+async function runQrLogin(command) {
+  const showQr = command.optsWithGlobals().format === 'table' && process.stderr.isTTY;
+  const result = await qrLogin(loadConfig(), {
+    progress,
+    showTerminalQr: showQr ? (text) => process.stderr.write(`${text}\n`) : undefined,
+  });
+  success(result);
+}
+
 function registerAuth(program) {
   const auth = program.command('auth').description('认证与登录态');
   auth.command('import').description('从终端粘贴或 stdin 导入 Cookie 并自动补全').option('--no-repair', '跳过联网补全').action(async (options) => {
@@ -411,13 +420,7 @@ function registerAuth(program) {
   auth.command('repair').description('补全已有 Cookie').action(async () => success(await completeCookies(authConfig('补全 Cookie'))));
   auth.command('login').option('--qr', '使用二维码登录').action(async (options, command) => {
     if (!options.qr) throw new UsageError('auth login 目前仅支持 --qr');
-    const global = command.optsWithGlobals();
-    const config = loadConfig();
-    const result = await qrLogin(config, {
-      progress,
-      showTerminalQr: global.format === 'table' ? (text) => process.stderr.write(`${text}\n`) : () => {},
-    });
-    success(result);
+    await runQrLogin(command);
   });
   auth.command('logout').action(() => success({ authenticated: false, cleared: clearAuthentication() }));
   auth.command('whoami').action(async () => success(compactAccount(await getMe(authConfig('查看当前账户')))));
@@ -431,8 +434,7 @@ function registerAuth(program) {
 
   program.command('login').option('--qrcode', '使用二维码登录').option('--qr', '使用二维码登录').action(async (options, command) => {
     if (!options.qrcode && !options.qr) throw new UsageError('login 目前仅支持 --qrcode');
-    const result = await qrLogin(loadConfig(), { progress, showTerminalQr: command.optsWithGlobals().format === 'table' ? (text) => process.stderr.write(`${text}\n`) : () => {} });
-    success(result);
+    await runQrLogin(command);
   });
   program.command('logout').action(() => success({ authenticated: false, cleared: clearAuthentication() }));
   program.command('whoami').action(async () => success(compactAccount(await getMe(authConfig('查看当前账户')))));

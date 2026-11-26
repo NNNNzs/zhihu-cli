@@ -3,7 +3,7 @@ name: zhihu-cli
 description: Use the zhihu-cli command to import a local Zhihu Cookie, research questions, answers, comments, feeds, users and topics, compile Markdown, and safely preview or apply Zhihu account actions. Use for Zhihu research, account workflows, content creation, or CLI setup in Codex, Hermes, OpenClaw, and other terminal-capable agents.
 homepage: https://github.com/NNNNzs/zhihu-cli
 metadata:
-  version: "1.0.2"
+  version: "1.0.3"
   author: NNNNzs
   license: AGPL-3.0-only
   repository: https://github.com/NNNNzs/zhihu-cli
@@ -39,9 +39,9 @@ All commands default to JSON. Read stdout as the single final result, and read s
 ## Authenticate safely
 
 1. Run `zhihu-cli auth status --offline` before authenticated work.
-2. If login is missing or expired, ask the user to paste Cookie directly into `zhihu-cli auth import` at their own terminal; the terminal prompts for one line without echoing it. The command also accepts a pipe or file redirection.
+2. If login is missing or expired, guide the user to sign in on `www.zhihu.com`. In their browser, open DevTools → Network → Doc and refresh the page. Select the document request for `www.zhihu.com` and copy the full value of `cookie` under Headers → Request Headers. Then ask them to run `zhihu-cli auth import` in their own terminal, paste at the prompt, and press Enter. The terminal hides the input. See the [login guide](README.md#登录) for details.
 3. Never request a Cookie in chat, extract one from chat, put one in an argument, read the config file, or echo Cookie values.
-4. QR login is not the recommended path: the upstream QR endpoint currently returns HTTP 403. If it is explicitly requested after that warning, keep it as a visible foreground process and never expose its URL or token.
+4. If the user explicitly requests CLI QR login, keep it in their foreground terminal and never relay the QR code, URL, or token. If Zhihu refuses the request or status check, direct the user to the official Zhihu login page, then have them run `zhihu-cli auth import` with the browser Cookie.
 
 Cookie import automatically attempts safe completion; use `auth repair` for an existing config. For a 401, try `auth repair` first. If it persists, ask the user to sign in again in their browser and import a fresh Cookie. Use `auth whoami`, `auth status`, and `auth logout` for account inspection and local logout.
 

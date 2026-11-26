@@ -1,6 +1,6 @@
 # 项目索引
 
-`zhihu-cli` 是 Node.js 20 + pnpm 的 CLI 与 Agent Skill，用于知乎内容研究和账号工作流。不要自动启动服务；CLI 都是前台短进程。用户登录优先在本机通过 stdin 粘贴导入 Cookie；二维码登录因上游 403 仅保留作人工排障入口。
+`zhihu-cli` 是 Node.js 20 + pnpm 的 CLI 与 Agent Skill，用于知乎内容研究和账号工作流。不要自动启动服务；CLI 都是前台短进程。用户登录优先在本机通过 stdin 粘贴导入 Cookie；CLI 二维码登录保留作人工排障入口，当知乎拒绝二维码请求或状态查询时使用官网登录后导入 Cookie。
 
 ## 目录
 

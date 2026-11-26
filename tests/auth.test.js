@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import QRCode from 'qrcode';
 import { absorbSetCookies, completeCookies, qrLogin } from '../scripts/lib/auth.js';
 import { loadConfig, saveCookies } from '../scripts/lib/config.js';
 
@@ -82,12 +83,15 @@ test('QR login handles unscanned, scanned, confirmed and saves private cookies',
   const events = [];
   const requested = [];
   const qrPath = path.join(directory, 'config', 'login_qrcode.png');
+  const qrLink = 'https://www.zhihu.com/account/scan/secret';
+  let terminalQr;
   try {
     const result = await qrLogin({ userAgent: 'test', zse93: '101_3_3.0' }, {
       qrPath,
       now: () => fakeNow,
       sleep: async (milliseconds) => { fakeNow += milliseconds; },
       progress: (event, data) => events.push({ event, data }),
+      showTerminalQr: (text) => { terminalQr = text; },
       request: async (url) => {
         requested.push(String(url));
         if (String(url).endsWith('/signin')) return jsonResponse({}, { cookies: ['_xsrf=x; Path=/', 'd_c0=device; Path=/'] });
@@ -97,12 +101,21 @@ test('QR login handles unscanned, scanned, confirmed and saves private cookies',
           if (poll === 2) return jsonResponse({ status: 1 });
           return jsonResponse({ success: true, user_id: 'u1' }, { cookies: ['z_c0=session; Path=/'] });
         }
-        if (String(url).endsWith('/login/qrcode')) return jsonResponse({ token: 'secret-qr-token', link: 'https://www.zhihu.com/account/scan/secret' });
+        if (String(url).endsWith('/login/qrcode')) return jsonResponse({ token: 'secret-qr-token', link: qrLink });
         if (String(url).endsWith('/api/v4/me')) return jsonResponse({ id: 'u1', name: '测试用户', url_token: 'tester' });
         return jsonResponse({});
       },
     });
     assert.equal(result.authenticated, true);
+    const rows = terminalQr.replaceAll('\x1b[30;47m', '').replaceAll('\x1b[0m', '').split('\n');
+    const modules = QRCode.create(qrLink, { errorCorrectionLevel: 'M' }).modules;
+    assert.equal(rows[0], ' '.repeat(modules.size + 8));
+    for (let y = 0; y < modules.size; y += 1) {
+      for (let x = 0; x < modules.size; x += 1) {
+        const cell = rows[2 + Math.floor(y / 2)][4 + x];
+        assert.equal(cell === '█' || cell === (y % 2 ? '▄' : '▀'), Boolean(modules.get(y, x)));
+      }
+    }
     assert.deepEqual(events.map((item) => item.event), ['qr_ready', 'scanned', 'confirmed']);
     assert.doesNotMatch(JSON.stringify(events), /secret-qr-token|account\/scan\/secret|session/);
     assert.equal(requested.some((url) => url.endsWith('/api/v4/me')), true);
@@ -117,23 +130,28 @@ test('QR login handles unscanned, scanned, confirmed and saves private cookies',
   }
 });
 
-test('QR login cleans the image on 403 and cancellation', async () => {
-  for (const mode of ['forbidden', 'cancelled']) {
+test('QR login stops polling and cleans the image on rejection, rate limits and cancellation', async () => {
+  for (const status of [401, 403, 429, null]) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhihu-qr-fail-'));
     const qrPath = path.join(directory, 'login_qrcode.png');
     const controller = new AbortController();
+    let polls = 0;
     try {
       await assert.rejects(qrLogin({ userAgent: 'test', zse93: '101_3_3.0' }, {
         qrPath,
         signal: controller.signal,
         now: () => 0,
-        sleep: async () => { if (mode === 'cancelled') controller.abort(); },
+        sleep: async () => { if (status === null) controller.abort(); },
         request: async (url) => {
           if (String(url).endsWith('/login/qrcode')) return jsonResponse({ token: 'token', link: 'https://www.zhihu.com/scan' });
-          if (String(url).endsWith('/scan_info')) return jsonResponse({}, { status: 403 });
+          if (String(url).endsWith('/scan_info')) {
+            polls += 1;
+            return jsonResponse({}, { status });
+          }
           return jsonResponse({});
         },
-      }), mode === 'forbidden' ? /403/ : /取消/);
+      }), status === null ? /取消/ : new RegExp(`状态查询.*HTTP ${status}.*zhihu-cli auth import`));
+      assert.equal(polls, status === null ? 0 : 1);
       assert.equal(fs.existsSync(qrPath), false);
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });

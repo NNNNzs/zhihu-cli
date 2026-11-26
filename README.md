@@ -32,20 +32,37 @@ pnpm zhihu-cli -- --version
 
 ## 登录
 
-在交互终端运行以下命令，按提示粘贴一行 Cookie 并回车。输入不会显示在终端。
+推荐先在[知乎网页版](https://www.zhihu.com/)登录，再把该浏览器会话的 Cookie 粘贴到本机终端。CLI 直接扫码可能被知乎拒绝。
+
+### 从浏览器复制 Cookie
+
+1. 在 Chrome 或 Edge 打开知乎首页，确认已登录自己的账号。
+2. 打开开发者工具，进入 **Network（网络）**，点 **Doc（文档）** 筛选，再刷新知乎页面。
+3. 选中知乎主页面的请求。在 **Headers（标头）** 的 **General（常规）** 中确认 **Request URL（请求网址）** 的域名是 `www.zhihu.com`。
+4. 在 **Request Headers（请求标头）** 下找到 `cookie`，复制它的完整值。保留分号分隔的各个 `名称=值`，从第一个名称开始复制。**Response Headers（响应标头）** 中的 `set-cookie` 不用于导入。
+
+如果请求列表为空，保持 Network 面板打开后再刷新一次。若只看到临时标头，勾选 **Disable cache（停用缓存）** 后刷新。参见 [Chrome 开发者工具的网络面板说明](https://developer.chrome.com/docs/devtools/network/reference/#headers)。
+
+### 在终端粘贴并导入
 
 ```bash
 zhihu-cli auth import
 ```
 
-也可以从标准输入管道或文件重定向导入。Cookie 不得进入命令参数、Shell 历史、日志或聊天。
+看到「请粘贴 Cookie 后按回车（输入不显示）」后，把刚才复制的完整值粘贴进去，然后按 **回车**。粘贴时终端不会显示任何字符。输出中 `imported: true` 表示已保存，可运行 `zhihu-cli auth whoami` 在线确认当前账号。
+
+Cookie 相当于网页登录凭证。只把它粘贴到自己的终端提示中，避免放入命令参数、Shell 历史、日志或聊天。
+
+### 其他导入方式
+
+也可以从标准输入管道或文件重定向导入。
 
 ```bash
 pbpaste | zhihu-cli auth import # macOS
 zhihu-cli auth import < cookies.txt
 ```
 
-当前知乎二维码登录接口会返回 HTTP 403，因此二维码不再作为推荐方案。保留 `zhihu-cli auth login --qr` 与兼容别名 `zhihu-cli login --qrcode` 仅供接口恢复后的人工排障；不要让 Agent 转发二维码、二维码 URL 或 token。
+CLI 扫码入口 `zhihu-cli auth login --qr --format table` 供人工排障使用，兼容别名为 `zhihu-cli login --qrcode`。即使二维码已生成，知乎仍可能拒绝状态查询。若返回 HTTP 403，请在 [知乎登录页](https://www.zhihu.com/signup) 扫码，再运行 `zhihu-cli auth import` 导入浏览器中的 Cookie。二维码、二维码 URL 和 token 只在本次登录中使用。
 
 `auth import` 默认尝试访问知乎初始化页补全 `_xsrf`、`d_c0` 等 Cookie；失败时保留已导入值并返回 warning。可用 `--no-repair` 跳过联网补全。Web 响应中的 Cookie 会原子滚动回写；没有可靠的 Web refresh-token 协议，401 后请先 `auth repair`，仍失败则重新登录并导入。
 
