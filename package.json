@@ -1,6 +1,6 @@
 {
   "name": "zhihu-cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "zhihu-cli Node.js CLI and Agent Skill for research, safe account workflows, and publishing",
   "type": "module",
   "license": "AGPL-3.0-only",

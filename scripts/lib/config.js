@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createInterface } from 'node:readline';
 
 export const DEFAULT_CONFIG = Object.freeze({
   cookies: {},
@@ -180,37 +181,25 @@ export function requireCookies(config, names, operation) {
   }
 }
 
-export async function readStdin({ prompt = '请粘贴 Cookie 后按回车：' } = {}) {
+export async function readStdin({ prompt = '请粘贴 Cookie 后按回车（输入不显示）：' } = {}) {
   if (!process.stdin.isTTY) {
     const chunks = [];
     for await (const chunk of process.stdin) chunks.push(chunk);
     return Buffer.concat(chunks).toString('utf8').trim();
   }
 
-  process.stderr.write(prompt);
-  return new Promise((resolve, reject) => {
-    let input = '';
-    const onData = (chunk) => {
-      const text = chunk.toString('utf8');
-      const newline = text.search(/[\r\n]/);
-      if (newline >= 0) {
-        input += text.slice(0, newline);
-        process.stdin.pause();
-        process.stdin.off('data', onData);
-        process.stdin.off('error', onError);
-        process.stderr.write('\n');
-        resolve(input.trim());
-      } else {
-        input += text;
-      }
-    };
-    const onError = (error) => {
-      process.stdin.off('data', onData);
-      reject(error);
-    };
-    process.stdin.setEncoding('utf8');
-    process.stdin.on('data', onData);
-    process.stdin.once('error', onError);
-    process.stdin.resume();
-  });
+  // Terminal mode handles line editing without echoing input when output is omitted.
+  const terminal = createInterface({ input: process.stdin, terminal: true, historySize: 0 });
+  try {
+    const input = await new Promise((resolve, reject) => {
+      terminal.once('line', resolve);
+      terminal.once('close', () => resolve(''));
+      terminal.once('error', reject);
+      process.stderr.write(prompt);
+    });
+    return input.trim();
+  } finally {
+    terminal.close();
+    process.stderr.write('\n');
+  }
 }
