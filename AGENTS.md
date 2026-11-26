@@ -7,7 +7,7 @@
 - `scripts/cli.js`：Commander 命令注册、兼容别名和输出编排。
 - `scripts/lib/auth.js`：二维码登录状态机。
 - `scripts/lib/client.js`：知乎读取、互动、发布和删除 API 封装。
-- `scripts/lib/config.js`：新旧配置、Cookie stdin 导入和权限。
+- `scripts/lib/config.js`：新旧配置、终端/stdin Cookie 导入和权限。
 - `scripts/lib/credentials.js`：Set-Cookie 解析、删除语义和凭证滚动回写。
 - `scripts/lib/content.js`：Markdown 本地图片发现、SHA-256 预览和发布时上传。
 - `scripts/lib/operations.js`：互动、创建、删除的两阶段确认。

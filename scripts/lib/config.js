@@ -180,9 +180,37 @@ export function requireCookies(config, names, operation) {
   }
 }
 
-export async function readStdin() {
-  if (process.stdin.isTTY) throw new Error('请通过 stdin 传入 Cookie，不要把 Cookie 放在命令行参数中');
-  const chunks = [];
-  for await (const chunk of process.stdin) chunks.push(chunk);
-  return Buffer.concat(chunks).toString('utf8').trim();
+export async function readStdin({ prompt = '请粘贴 Cookie 后按回车：' } = {}) {
+  if (!process.stdin.isTTY) {
+    const chunks = [];
+    for await (const chunk of process.stdin) chunks.push(chunk);
+    return Buffer.concat(chunks).toString('utf8').trim();
+  }
+
+  process.stderr.write(prompt);
+  return new Promise((resolve, reject) => {
+    let input = '';
+    const onData = (chunk) => {
+      const text = chunk.toString('utf8');
+      const newline = text.search(/[\r\n]/);
+      if (newline >= 0) {
+        input += text.slice(0, newline);
+        process.stdin.pause();
+        process.stdin.off('data', onData);
+        process.stdin.off('error', onError);
+        process.stderr.write('\n');
+        resolve(input.trim());
+      } else {
+        input += text;
+      }
+    };
+    const onError = (error) => {
+      process.stdin.off('data', onData);
+      reject(error);
+    };
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', onData);
+    process.stdin.once('error', onError);
+    process.stdin.resume();
+  });
 }

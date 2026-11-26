@@ -398,7 +398,7 @@ const USER_TABLE = [
 
 function registerAuth(program) {
   const auth = program.command('auth').description('认证与登录态');
-  auth.command('import').description('从 stdin 导入 Cookie 并自动补全').option('--no-repair', '跳过联网补全').action(async (options) => {
+  auth.command('import').description('从终端粘贴或 stdin 导入 Cookie 并自动补全').option('--no-repair', '跳过联网补全').action(async (options) => {
     const result = saveCookies(parseCookieHeader(await readStdin()));
     if (!options.repair) return success({ imported: true, completed: false, configPath: result.configPath, cookieNames: result.cookieNames });
     try {

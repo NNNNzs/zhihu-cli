@@ -1,6 +1,6 @@
 # zhihu-cli
 
-面向人类与 AI Agent 的完整 `zhihu-cli`：支持安全登录、内容检索与阅读、用户和话题研究、互动、Markdown 创作、多类型内容发布，以及受确认令牌保护的写操作。根目录 `SKILL.md` 可供 Codex、Hermes、OpenClaw 等支持 Agent Skills 的宿主使用。
+面向人类与 AI Agent 的完整知乎 CLI：支持安全登录、内容检索与阅读、用户和话题研究、互动、Markdown 创作、多类型内容发布，以及受确认令牌保护的写操作。根目录 `SKILL.md` 可供 Codex、Hermes、OpenClaw 等支持 Agent Skills 的宿主使用。
 
 > 本项目使用知乎未公开承诺稳定的 Web 接口，不是知乎官方 SDK。请遵守知乎服务条款、隐私政策和社区规范；项目不会绕过 CAPTCHA、访问控制、频率限制或风控。
 
@@ -11,20 +11,20 @@
 ```bash
 # npm registry 发布后，全局安装
 npm install -g zhihu-cli
-zhihu-cli --version
+zhihu --version
 
 # 当前可用的源码安装方式（同样只使用 npm）
 npm install -g github:NNNNzs/zhihu-cli
-zhihu-cli --version
+zhihu --version
 
 # 源码安装
 git clone https://github.com/NNNNzs/zhihu-cli.git
 cd zhihu-cli
 npm install
-npm run zhihu-cli -- --version
+npm run zhihu -- --version
 ```
 
-`zhihu-cli` 同时是仓库名、npm 包名、Skill 名和唯一正式命令。本项目不提供 `zhihu` 兼容命令，也不需要或自动启动后台服务。
+`zhihu-cli` 是 npm 包名与 Skill 名，`zhihu` 是唯一推荐的命令。`zhihu-cli` 可执行文件仅为向后兼容保留；文档、脚本和 Agent 指令均应使用 `zhihu`。本项目不需要也不会自动启动后台服务。
 
 可以把下面这句话直接发给支持终端和 Agent Skills 的 Agent：
 
@@ -32,28 +32,30 @@ npm run zhihu-cli -- --version
 
 ## 登录
 
-推荐由用户在自己的本机终端粘贴 Cookie 后导入。Cookie 只能经标准输入传递，不能发进聊天、放入命令参数或提交到仓库。
+在 SSH、Linux 或本地终端直接运行导入命令，按提示粘贴 Cookie 并回车：
 
 ```bash
-# macOS：用户先在浏览器中复制 Cookie，再执行
-pbpaste | zhihu-cli auth import
-
-# 已有本地文件
-zhihu-cli auth import < cookies.txt
-zhihu-cli auth repair
+zhihu auth import
 ```
 
-当前知乎二维码登录接口会返回 HTTP 403，因此二维码不再作为推荐方案。保留 `zhihu-cli auth login --qr` 与 `zhihu-cli login --qrcode` 仅供接口恢复后的人工排障；不要让 Agent 转发二维码、二维码 URL 或 token。
+也可以继续通过 stdin 或文件导入；Cookie 只经标准输入传递，不能放进命令参数、shell 历史或聊天：
 
-`auth import` 会尝试访问知乎初始化页补全 `_xsrf`、`d_c0` 等 Cookie；失败时保留已导入值并返回 warning。可用 `--no-repair` 跳过联网补全。Web 响应中的 Cookie 会原子滚动回写；没有可靠的 Web refresh-token 协议，401 后请先 `auth repair`，仍失败则重新扫码。
+```bash
+zhihu auth import < cookies.txt
+zhihu auth repair
+```
+
+当前知乎二维码登录接口会返回 HTTP 403，因此二维码不再作为推荐方案。保留 `zhihu auth login --qr` 与兼容别名 `zhihu login --qrcode` 仅供接口恢复后的人工排障；不要让 Agent 转发二维码、二维码 URL 或 token。
+
+`auth import` 会在 SSH、Linux 或本地交互终端提示用户粘贴 Cookie 并按回车；也支持从 stdin/文件重定向导入，但 Cookie 不得进入命令参数、shell 历史、日志或聊天。导入会尝试访问知乎初始化页补全 `_xsrf`、`d_c0` 等 Cookie；失败时保留已导入值并返回 warning。可用 `--no-repair` 跳过联网补全。Web 响应中的 Cookie 会原子滚动回写；没有可靠的 Web refresh-token 协议，401 后请先 `auth repair`，仍失败则重新登录并导入。
 
 登录态保存在 `~/.zhihu-cli/config.json`，目录和文件权限分别为 `0700`、`0600`。旧 `~/.zhihu-creator/config.json` 与 `ZHIHU_CREATOR_CONFIG` 只做兼容读取；新覆盖变量为 `ZHIHU_CLI_CONFIG`。
 
 ```bash
-zhihu-cli auth status --offline
-zhihu-cli auth status
-zhihu-cli auth whoami
-zhihu-cli auth logout
+zhihu auth status --offline
+zhihu auth status
+zhihu auth whoami
+zhihu auth logout
 ```
 
 ## 查询命令
@@ -61,34 +63,34 @@ zhihu-cli auth logout
 所有命令默认输出稳定 JSON：`{ "ok": true, "data": ..., "paging": ..., "warnings": ... }`。错误只写 stderr，并返回非零退出码。使用 `--format table` 可切换紧凑表格，使用 `--verbose` 可查看仅含方法、脱敏 URL、状态码、耗时和重试次数的日志。
 
 ```bash
-zhihu-cli search --query "React 性能" --type general --limit 10
-zhihu-cli search --query "产品经理" --type people
-zhihu-cli search --query "人工智能" --type topic
-zhihu-cli search --query "Node.js" --questions-only --answers 3
+zhihu search --query "React 性能" --type general --limit 10
+zhihu search --query "产品经理" --type people
+zhihu search --query "人工智能" --type topic
+zhihu search --query "Node.js" --questions-only --answers 3
 
-zhihu-cli feed hot --limit 20 --answers 2
-zhihu-cli feed hot-search --limit 20
-zhihu-cli hot-search --limit 20
-zhihu-cli feed recommend --limit 10 --expand --comments 3
-zhihu-cli feeds --limit 10 --comment-limit 3
+zhihu feed hot --limit 20 --answers 2
+zhihu feed hot-search --limit 20
+zhihu hot-search --limit 20
+zhihu feed recommend --limit 10 --expand --comments 3
+zhihu feeds --limit 10 --comment-limit 3
 
-zhihu-cli question 12345678
-zhihu-cli question answers 12345678 --limit 10 --sort default
-zhihu-cli answer 87654321
-zhihu-cli answer comments 87654321 --limit 20
-zhihu-cli answer comments 87654321 --all
-zhihu-cli article show 123456
+zhihu question 12345678
+zhihu question answers 12345678 --limit 10 --sort default
+zhihu answer 87654321
+zhihu answer comments 87654321 --limit 20
+zhihu answer comments 87654321 --all
+zhihu article show 123456
 
-zhihu-cli user somebody
-zhihu-cli user answers somebody
-zhihu-cli user articles somebody
-zhihu-cli user followers somebody
-zhihu-cli user following somebody
-zhihu-cli topic 19550517
-zhihu-cli topic questions 19550517
+zhihu user somebody
+zhihu user answers somebody
+zhihu user articles somebody
+zhihu user followers somebody
+zhihu user following somebody
+zhihu topic 19550517
+zhihu topic questions 19550517
 
-zhihu-cli account collections
-zhihu-cli account notifications --limit 10 --offset 0
+zhihu account collections
+zhihu account notifications --limit 10 --offset 0
 ```
 
 公开内容在接口允许时支持匿名读取；收藏、通知、个性化推荐和所有写操作必须登录。列表命令限制单页数量，评论只有显式 `--all` 才会翻页，并受最大页数保护。
@@ -99,15 +101,15 @@ zhihu-cli account notifications --limit 10 --offset 0
 
 ```bash
 # 赞同与关注
-zhihu-cli answer vote preview 87654321 --state up
-zhihu-cli answer vote apply 87654321 --state up --confirm <token>
-zhihu-cli question follow preview 12345678
-zhihu-cli question follow apply 12345678 --confirm <token>
+zhihu answer vote preview 87654321 --state up
+zhihu answer vote apply 87654321 --state up --confirm <token>
+zhihu question follow preview 12345678
+zhihu question follow apply 12345678 --confirm <token>
 
 # 兼容平铺别名：无 --confirm 时只预览
-zhihu-cli vote 87654321
-zhihu-cli vote 87654321 --confirm <token>
-zhihu-cli follow-question 12345678 --unfollow
+zhihu vote 87654321
+zhihu vote 87654321 --confirm <token>
+zhihu follow-question 12345678 --unfollow
 ```
 
 重复执行已达到目标状态的点赞或关注会返回幂等成功，不会重复写入。
@@ -117,29 +119,29 @@ zhihu-cli follow-question 12345678 --unfollow
 本地图片可直接写在 Markdown 中，也可重复传入 `--image`。预览只校验路径、格式、尺寸并计算 SHA-256；publish 阶段才上传图片并编译最终 HTML。发布内容禁止保留 `file:` URL。
 
 ```bash
-zhihu-cli answer compile --input answer.md
+zhihu answer compile --input answer.md
 
 # 独立图片上传也是两阶段
-zhihu-cli image upload --file diagram.png
-zhihu-cli image upload --file diagram.png --confirm <token>
+zhihu image upload --file diagram.png
+zhihu image upload --file diagram.png --confirm <token>
 
 # 回答：draft 不带令牌时返回草稿预览
-zhihu-cli answer preview --question-id 12345678 --input answer.md --image diagram.png
-zhihu-cli answer publish --question-id 12345678 --input answer.md --image diagram.png --confirm <token>
-zhihu-cli answer draft --question-id 12345678 --input answer.md
-zhihu-cli answer draft --question-id 12345678 --input answer.md --confirm <token>
+zhihu answer preview --question-id 12345678 --input answer.md --image diagram.png
+zhihu answer publish --question-id 12345678 --input answer.md --image diagram.png --confirm <token>
+zhihu answer draft --question-id 12345678 --input answer.md
+zhihu answer draft --question-id 12345678 --input answer.md --confirm <token>
 
 # 提问、想法、文章
-zhihu-cli question create preview --title "问题标题" --input question.md --topic 19550517 --image diagram.png
-zhihu-cli question create publish --title "问题标题" --input question.md --topic 19550517 --image diagram.png --confirm <token>
-zhihu-cli pin create preview --title "想法标题" --input pin.md --image photo.jpg
-zhihu-cli article create preview --title "文章标题" --input article.md --topic 19550517
+zhihu question create preview --title "问题标题" --input question.md --topic 19550517 --image diagram.png
+zhihu question create publish --title "问题标题" --input question.md --topic 19550517 --image diagram.png --confirm <token>
+zhihu pin create preview --title "想法标题" --input pin.md --image photo.jpg
+zhihu article create preview --title "文章标题" --input article.md --topic 19550517
 
 # 删除自己的内容
-zhihu-cli question delete preview 12345678
-zhihu-cli question delete apply 12345678 --confirm <token>
-zhihu-cli pin delete preview 123
-zhihu-cli article delete preview 456
+zhihu question delete preview 12345678
+zhihu question delete apply 12345678 --confirm <token>
+zhihu pin delete preview 123
+zhihu article delete preview 456
 ```
 
 平铺兼容命令包括 `hot`、`answers`、`feed`、`feeds`、`user-answers`、`user-articles`、`followers`、`following`、`collections`、`notifications`、`ask`、`pin`、`article`、`delete-question`、`delete-pin`、`delete-article`。`ask`、`pin`、`article` 及删除别名无 `--confirm` 时只返回预览。
@@ -148,7 +150,7 @@ zhihu-cli article delete preview 456
 
 ## Agent 安装
 
-仓库根 `SKILL.md` 是唯一 Skill 入口和源文件；Skills CLI 直接从仓库根目录读取它，`references/` 与 `docs/` 作为相对引用资料随仓库和 npm 包分发，不再维护重复的 `dist/` 副本。
+仓库根 `SKILL.md` 是唯一源文件，包含与 npm 包版本一致的 Skill 元数据；`pnpm sync:skills` 生成 `dist/skills/zhihu-cli/` 的分发副本，`pnpm check:skills` 检查漂移。
 
 ```bash
 # 安装到所有三个宿主（Skills CLI 当前支持 Codex、Hermes Agent、OpenClaw）
@@ -192,20 +194,10 @@ pnpm test
 pnpm check
 pnpm pack --dry-run
 pnpm verify:pack
-pnpm release
 
 # 只读真实接口，默认不会运行
 ZHIHU_LIVE_TESTS=1 pnpm test:live
 ```
-
-`pnpm release` 只运行发布前检查，不会上传 npm。确认检查通过、版本号已更新且已登录 npm 后，再显式执行：
-
-```bash
-pnpm release -- --publish
-pnpm release -- --publish --tag next
-```
-
-默认发布到官方 npm registry；私有 registry 可通过 `--registry <url>` 指定。脚本不会自动升级版本号，也不会把 npm token 写入命令行。
 
 架构和目录索引见 [AGENTS.md](AGENTS.md)，接口约定见 [references/api.md](references/api.md)，Markdown 规则见 [references/markdown.md](references/markdown.md)，历史功能对比与设计决策见 [docs/competitive-analysis.md](docs/competitive-analysis.md)。
 
